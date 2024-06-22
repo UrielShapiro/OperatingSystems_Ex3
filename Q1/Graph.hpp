@@ -1,3 +1,5 @@
+#pragma once
+
 #include <list>
 
 using vertex = size_t;

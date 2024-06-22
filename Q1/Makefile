@@ -15,7 +15,5 @@ all: $(EXE)
 $(EXE): $(main).cpp $(OBJECTS)
 	$(CXX) $(CXXFLAGS) -o $@ $^
 
-
 %.o: %.cpp %.hpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
-
