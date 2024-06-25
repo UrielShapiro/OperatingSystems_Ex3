@@ -1,19 +1,28 @@
 CXX = g++
-CXXFLAGS = -Wall -Wextra -Werror -g
+CXXFLAGS = -Wall -Wextra -Werror -g -std=c++17
 
 main = main
 
-SRCS = $(wildcard *.cpp)
-SRC := $(filter-out $(main).cpp, $(SRCS))
-
-OBJECTS = $(SRCS:.cpp=.o)
+GRAPH = Graph
+GRAPH_IMPL = AdjacencyGraph
+# GRAPH_IMPL = ListGraph
+HEADERS = $(GRAPH).hpp $(GRAPH_IMPL).hpp
 
 EXE = Kosaraju
 
 all: $(EXE)
 
-$(EXE): $(main).cpp $(OBJECTS)
+$(EXE): $(main).o $(GRAPH_IMPL).o
 	$(CXX) $(CXXFLAGS) -o $@ $^
 
-%.o: %.cpp %.hpp
+$(main).o: $(main).cpp $(HEADERS)
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(GRAPH_IMPL).o: $(GRAPH_IMPL).cpp $(GRAPH_IMPL).hpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+.PHONY: clean all
+.SUFFIXES:
+
+clean: 
+	rm -rf *.o $(EXE)
