@@ -35,7 +35,7 @@ list<vertex> ListGraph::get_neighbors(const vertex v) const
 bool ListGraph::add_edge(const vertex src, const vertex dst)
 {
     bool output = std::find(this->adjacency_list.at(src).begin(),
-                            this->adjacency_list.at(src).end(), dst) == this->adjacency_list.at(src + 1).end();
+                            this->adjacency_list.at(src).end(), dst) == this->adjacency_list.at(src).end();
     if (output)
         this->adjacency_list.at(src).push_back(dst);
 
@@ -45,7 +45,7 @@ bool ListGraph::add_edge(const vertex src, const vertex dst)
 bool ListGraph::remove_edge(const vertex src, const vertex dst)
 {
     bool output = std::find(this->adjacency_list.at(src).begin(),
-                            this->adjacency_list.at(src).end(), dst) != this->adjacency_list.at(src + 1).end();
+                            this->adjacency_list.at(src).end(), dst) != this->adjacency_list.at(src).end();
     if (output)
         this->adjacency_list.at(src).remove(dst);
 
