@@ -8,6 +8,7 @@
 #include <string>
 #include <sstream>
 #include "Graph.hpp"
+#include "kosaraju.hpp"
 
 #define GRAPH_IMPL AdjacencyGraph
 // #define GRAPH_IMPL ListGraph
@@ -20,72 +21,120 @@
 
 using std::cin, std::cout, std::set;
 
-void visit(const Graph &g, std::map<vertex, bool> &visited, std::list<vertex> &l, vertex u)
+bool handle_user_input(Graph **g, std::string input)
 {
-    if (visited[u])
-        return;
-    visited[u] = true;
-    for (auto v : g.get_neighbors(u))
-        visit(g, visited, l, v);
-    l.push_front(u);
-}
-
-void assign(const Graph &g, std::map<vertex, std::set<vertex>> &assignments, std::map<vertex, bool> &assigned, vertex u, vertex root)
-{
-    if (assigned[u])
-        return;
-    assignments[root].insert(u);
-    assigned[u] = true;
-    size_t n = g.get_vertex_count();
-    for (vertex v = 1; v <= n; ++v)
+    if (!g)
     {
-        auto v_neighbors = g.get_neighbors(v);
-        if (v == u || std::find(v_neighbors.begin(), v_neighbors.end(), u) == v_neighbors.end())
-            continue;
-        assign(g, assignments, assigned, v, root);
+        throw std::invalid_argument("Graph pointer is NULL");
     }
-}
-
-std::set<std::set<vertex>> kosaraju(const Graph &g)
-{
-    size_t n = g.get_vertex_count();
-    std::map<vertex, bool> visited;
-    std::list<vertex> l;
-    for (vertex i = 1; i <= n; ++i)
-        visited[i] = false;
-    for (vertex u = 1; u <= n; ++u)
-        visit(g, visited, l, u);
-    std::map<vertex, std::set<vertex>> assignments;
-    std::map<vertex, bool> assigned;
-    for (vertex i = 1; i <= n; ++i)
-        assigned[i] = false;
-    for (auto u : l)
-    {
-        assign(g, assignments, assigned, u, u);
-    }
-    std::set<std::set<vertex>> result;
-    for (auto &[_, comp] : assignments)
-    {
-        result.insert(comp);
-    }
-    return result;
-}
-
-void handle_user_input(Graph **g, std::string input)
-{
-    (void) g;
     std::istringstream is(input);
     std::string command;
     std::getline(is, command, ' ');
-    cout << command;
+    if (command == "Kosaraju")
+    {
+        if (!*g)
+        {
+            cout << "Please create a graph using Newgraph <n>,<m> first" << std::endl;
+            return false;
+        }
+        auto comps = kosaraju(**g);
+        cout << "The strongly connected components are: " << std::endl;
+        for (auto comp : comps)
+        {
+            for (vertex v : comp)
+            {
+                std::cout << v << " ";
+            }
+            std::cout << std::endl;
+        }
+        return false;
+    }
+    else if (command == "Newgraph")
+    {
+        std::string param1, param2;
+        std::getline(is, param1, ',');
+        std::getline(is, param2);
+        if (param1.length() == 0 || param2.length() == 0)
+        {
+            cout << "Not enough parameters detected, command ignored" << std::endl;
+        }
+        size_t n = strtoull(param1.c_str(), nullptr, 10), m = strtoull(param2.c_str(), nullptr, 10);
+        if (*g)
+            delete *g;
+        std::vector<std::pair<vertex, vertex>> edges;
+        for (size_t i = 0; i < m; ++i) // FIXME
+        {
+            vertex src, dst;
+            cin >> src >> dst;
+            edges.push_back(std::make_pair(src, dst));
+        }
+        *g = new GRAPH_IMPL(n, edges);
+        return false;
+    }
+    else if (command == "Newedge")
+    {
+        if (!*g)
+        {
+            cout << "Please create a graph using Newgraph <n>,<m> first" << std::endl;
+            return false;
+        }
+        std::string param1, param2;
+        std::getline(is, param1, ',');
+        std::getline(is, param2);
+        if (param1.length() == 0 || param2.length() == 0)
+        {
+            cout << "Not enough parameters detected, command ignored" << std::endl;
+        }
+        vertex src = strtoull(param1.c_str(), nullptr, 10), dst = strtoull(param2.c_str(), nullptr, 10);
+        if (!(*g)->add_edge(src, dst))
+            cout << "Edge already exists" << std::endl;
+        else
+            cout<<"Edge was created successfuly"<<std::endl;
+        return false;
+    }
+    else if (command == "Removeedge")
+    {
+        if (!*g)
+        {
+            cout << "Please create a graph using Newgraph <n>,<m> first" << std::endl;
+            return false;
+        }
+        std::string param1, param2;
+        std::getline(is, param1, ',');
+        std::getline(is, param2);
+        if (param1.length() == 0 || param2.length() == 0)
+        {
+            cout << "Not enough parameters detected, command ignored" << std::endl;
+        }
+        vertex src = strtoull(param1.c_str(), nullptr, 10), dst = strtoull(param2.c_str(), nullptr, 10);
+        if (!(*g)->remove_edge(src, dst))
+            cout << "Edge does not exist" << std::endl;
+        return false;
+    }
+    else if (command == "Exit")
+    {
+        return true;
+    }
+    else
+    {
+        cout << "Unkown command" << std::endl;
+        return false;
+    }
 }
 
 int main()
 {
     std::string input;
-    std::getline(cin, input);
-    handle_user_input(nullptr, input);
- 
+
+    Graph *g = nullptr;
+    bool exit = false;
+    while (!exit)
+    {
+        cout << "Enter command: ";
+        std::getline(cin, input);
+        exit = handle_user_input(&g, input);
+    }
+
     /*
     size_t vertex_count, edge_count;
     std::vector<std::pair<vertex, vertex>> edges;
@@ -101,16 +150,9 @@ int main()
         edges.push_back(std::make_pair(src, dst));
     }
 
-    Graph *g = new GRAPH_IMPL(vertex_count, edge_count, edges);
-    auto comps = kosaraju(*g);
-    cout << "The strongly connected components are: " << std::endl;
-    for (auto comp : comps)
-    {
-        for (vertex v : comp)
-        {
-            std::cout << v << " ";
-        }
-        std::cout << std::endl;
-    }
+    Graph *g = new GRAPH_IMPL(vertex_count, edges);
+
+
+    delete g;
     */
 }
