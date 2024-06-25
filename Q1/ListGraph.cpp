@@ -1,16 +1,16 @@
 #include "ListGraph.hpp"
 #include <algorithm>
+#include <stdexcept>
 
-ListGraph::ListGraph(size_t vertices, size_t num_of_edges, vector<pair<vertex, vertex>> edges)
+ListGraph::ListGraph(size_t vertices, vector<pair<vertex, vertex>> edges)
 {
     this->adjacency_list.reserve(vertices + 1);
 
-    for (size_t i = 1; i < num_of_edges; i++)
+    for (pair p : edges)
     {
-        for (pair p : edges)
-        {
-            this->adjacency_list.at(p.first + 1).push_back(p.second);
-        }
+        if (p.first > adjacency_list.size() || p.second > adjacency_list.size() || p.first <= 0 || p.second <= 0)
+            throw std::invalid_argument("Error: Invalid Argument");
+        this->adjacency_list.at(p.first).push_back(p.second);
     }
 }
 
