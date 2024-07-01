@@ -56,7 +56,8 @@ void Reactor::start()
 
 void Reactor::stop()
 {
-    if (!thread) return;
+    if (!thread)
+        return;
     running_mutex.lock();
     running = false;
     running_mutex.unlock();
