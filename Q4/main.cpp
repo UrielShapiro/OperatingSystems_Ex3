@@ -44,7 +44,7 @@ bool handle_user_input(int fd, Graph **g, std::string input)
     pipe(pipefd);
     dup2(pipefd[PIPE_READ_END], STDIN_FILENO);
     dup2(pipefd[PIPE_WRITE_END], STDOUT_FILENO);
-    
+
     if (!g)
     {
         throw std::invalid_argument("Graph pointer is NULL");
@@ -248,7 +248,7 @@ int main()
                 if (it->revents & POLLIN)
                 {
                     string input = handle_client_input(it->fd); // will check what is the input and send the apropriate output.
-                    handle_user_input(&g, input);
+                    handle_user_input(it->fd, &g, input);
                 }
             }
         }
