@@ -3,8 +3,6 @@
 #include <algorithm>
 #include <utility>
 #include <set>
-#include <list>
-#include <map>
 #include <string>
 #include <sstream>
 #include <unistd.h>
@@ -14,11 +12,8 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <fcntl.h>
-#include <unistd.h>
 #include "Graph.hpp"
 #include "kosaraju.hpp"
-#include "HandleClients.hpp"
-#include <string.h>
 
 #define GRAPH_IMPL AdjacencyGraph
 // #define GRAPH_IMPL ListGraph
@@ -31,20 +26,45 @@
 
 #define PORT 9034
 #define MAX_USERS 5
-#define POLL_TIMEOUT 5
+#define POLL_TIMEOUT 10
+#define MAX_SEGMENT_SIZE 65535
 
-#define PIPE_READ_END 0
-#define PIPE_WRITE_END 1
+// #define DEBUG
 
 using std::cin, std::cout, std::set, std::string;
 
+/**
+ * @brief Send a message to the client
+ * @return true if an error occurred, false otherwise
+ */
+bool send_message(int fd, string message)
+{
+    return write(fd, message.c_str(), message.length() + 1) < 0;
+}
+
+/**
+ * @brief Receive a message from the client
+ * @return The received message
+ * @throw Throws runtime_error if an error occurred
+ */
+string receive_message(int fd)
+{
+    char buffer[MAX_SEGMENT_SIZE];
+    ssize_t bytes_read = read(fd, buffer, MAX_SEGMENT_SIZE);
+    if (bytes_read < 0)
+    {
+        throw std::runtime_error("Something went wrong when trying to read from the socket");
+    }
+    if (bytes_read == 0)
+    {
+        throw std::runtime_error("Connection closed by the client");
+    }
+    buffer[bytes_read] = '\0'; // Null-terminate the buffer if it's a string
+    return buffer;
+}
+
 bool handle_user_input(int fd, Graph **g, std::string input)
 {
-    int pipefd[2];
-    pipe(pipefd);
-    dup2(pipefd[PIPE_READ_END], STDIN_FILENO);
-    dup2(pipefd[PIPE_WRITE_END], STDOUT_FILENO);
-
     if (!g)
     {
         throw std::invalid_argument("Graph pointer is NULL");
@@ -56,18 +76,26 @@ bool handle_user_input(int fd, Graph **g, std::string input)
     {
         if (!*g)
         {
-            cout << "Please create a graph using Newgraph <n>,<m> first" << std::endl;
+            if (send_message(fd, "Please create a graph using Newgraph <n>,<m> first\n"))
+            {
+                throw std::runtime_error("Error sending a message to the client");
+            }
             return false;
         }
         auto comps = kosaraju(**g);
-        cout << "The strongly connected components are: " << std::endl;
+        string message;
+        message += "The strongly connected components are: \n";
         for (auto comp : comps)
         {
             for (vertex v : comp)
             {
-                std::cout << v << " ";
+                message += std::to_string(v) + ' ';
             }
-            std::cout << std::endl;
+            message += '\n';
+        }
+        if (send_message(fd, message))
+        {
+            throw std::runtime_error("Error sending a message to the client");
         }
         return false;
     }
@@ -78,7 +106,10 @@ bool handle_user_input(int fd, Graph **g, std::string input)
         std::getline(is, param2);
         if (param1.length() == 0 || param2.length() == 0)
         {
-            cout << "Not enough parameters detected, command ignored" << std::endl;
+            if (send_message(fd, "Not enough parameters detected, command ignored\n"))
+            {
+                throw std::runtime_error("Error sending a message to the client");
+            }
         }
         size_t n = strtoull(param1.c_str(), nullptr, 10), m = strtoull(param2.c_str(), nullptr, 10);
         if (*g)
@@ -87,7 +118,12 @@ bool handle_user_input(int fd, Graph **g, std::string input)
         for (size_t i = 0; i < m; ++i) // FIXME
         {
             vertex src, dst;
-            cin >> src >> dst;
+            string received_edge = receive_message(fd);
+            cout << "Received edge: " << received_edge << std::endl;
+            char *space;
+            src = strtoull(received_edge.c_str(), &space, 10);
+            dst = strtoull(space + 1, nullptr, 10);
+            cout << "Parsed edge: " << src << " " << dst << std::endl;
             edges.push_back(std::make_pair(src, dst));
         }
         *g = new GRAPH_IMPL(n, edges);
@@ -97,7 +133,10 @@ bool handle_user_input(int fd, Graph **g, std::string input)
     {
         if (!*g)
         {
-            cout << "Please create a graph using Newgraph <n>,<m> first" << std::endl;
+            if (send_message(fd, "Please create a graph using Newgraph <n>,<m> first\n"))
+            {
+                throw std::runtime_error("Error sending a message to the client");
+            }
             return false;
         }
         std::string param1, param2;
@@ -105,20 +144,36 @@ bool handle_user_input(int fd, Graph **g, std::string input)
         std::getline(is, param2);
         if (param1.length() == 0 || param2.length() == 0)
         {
-            cout << "Not enough parameters detected, command ignored" << std::endl;
+            if (send_message(fd, "Not enough parameters detected, command ignored\n"))
+            {
+                throw std::runtime_error("Error sending a message to the client");
+            }
         }
         vertex src = strtoull(param1.c_str(), nullptr, 10), dst = strtoull(param2.c_str(), nullptr, 10);
         if (!(*g)->add_edge(src, dst))
-            cout << "Edge already exists" << std::endl;
+        {
+            if (send_message(fd, "Edge already exists\n"))
+            {
+                throw std::runtime_error("Error sending a message to the client");
+            }
+        }
         else
-            cout << "Edge was created successfuly" << std::endl;
+        {
+            if (send_message(fd, "Edge was created successfuly\n"))
+            {
+                throw std::runtime_error("Error sending a message to the client");
+            }
+        }
         return false;
     }
     else if (command == "Removeedge")
     {
         if (!*g)
         {
-            cout << "Please create a graph using Newgraph <n>,<m> first" << std::endl;
+            if (send_message(fd, "Please create a graph using Newgraph <n>,<m> first\n"))
+            {
+                throw std::runtime_error("Error sending a message to the client");
+            }
             return false;
         }
         std::string param1, param2;
@@ -126,27 +181,45 @@ bool handle_user_input(int fd, Graph **g, std::string input)
         std::getline(is, param2);
         if (param1.length() == 0 || param2.length() == 0)
         {
-            cout << "Not enough parameters detected, command ignored" << std::endl;
+            if (send_message(fd, "Not enough parameters detected, command ignored\n"))
+            {
+                throw std::runtime_error("Error sending a message to the client");
+            }
         }
         vertex src = strtoull(param1.c_str(), nullptr, 10), dst = strtoull(param2.c_str(), nullptr, 10);
         if (!(*g)->remove_edge(src, dst))
-            cout << "Edge does not exist" << std::endl;
+        {
+            if (send_message(fd, "Edge does not exist\n"))
+            {
+                throw std::runtime_error("Error sending a message to the client");
+            }
+        }
+        else
+        {
+            if (send_message(fd, "Edge was removed successfuly\n"))
+            {
+                throw std::runtime_error("Error sending a message to the client");
+            }
+        }
         return false;
     }
     else if (command == "Exit")
     {
+        std::cout << "Connection closed by the client" << std::endl;
         return true;
     }
     else
     {
-        cout << "Unkown command" << std::endl;
+        if (send_message(fd, "Unknown command\n"))
+        {
+            throw std::runtime_error("Error sending a message to the client");
+        }
         return false;
     }
 }
 
 int main()
 {
-
     Graph *g = nullptr;
 
     int server_fd = -1;
@@ -154,7 +227,8 @@ int main()
     struct sockaddr_in address;
     int opt = 1;
     int addrlen = sizeof(address);
-    char buffer[MAX_SEGMENT_SIZE] = {0};
+
+    std::cout << "Waiting for incoming connections..." << std::endl;
 
     // Creating socket file descriptor
     if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0)
@@ -206,27 +280,29 @@ int main()
             .events = POLLIN,
             .revents = 0,
         });
+        if (send_message(new_socket, "Enter command: "))
+        {
+            close(new_socket);
+            close(server_fd);
+            throw std::runtime_error("Error sending a message to the client");
+        }
     }
 
     std::cout << "Server is listening on port " << PORT << std::endl;
 
     // Set the socket to non-blocking mode
-    if (fcntl(server_fd, F_GETFL | O_NONBLOCK, 0) < 0)
+    if (fcntl(server_fd, F_SETFL, O_NONBLOCK) < 0)
     {
-        perror("fcntl(F_GETFL | O_NONBLOCK)");
+        perror("fcntl(F_SETFL | O_NONBLOCK)");
         close(server_fd);
         exit(EXIT_FAILURE);
     }
 
-    GraphInput input_params = initialize_graph(pfds.back().fd);
-
-    Graph *g = new GRAPH_IMPL(input_params.vertex_count, input_params.edges);
-
-    bool to_exit = false;
-    while (!to_exit)
+    while (!pfds.empty())
     {
+        new_socket = -1;
         // Accept an incoming connection
-        if ((new_socket = accept(server_fd, (struct sockaddr *)&address, (socklen_t *)&addrlen)) < 0)
+        if ((new_socket = accept(server_fd, (struct sockaddr *)&address, (socklen_t *)&addrlen)) < 0 && errno != EAGAIN)
         {
             perror("accept");
             close(server_fd);
@@ -234,29 +310,66 @@ int main()
         }
         if (new_socket > 0)
         {
-            pfds.push_back((struct pollfd){
+            pfds.push_back(pollfd{
                 .fd = new_socket,
                 .events = POLLIN,
                 .revents = 0,
             });
+            send_message(new_socket, "Enter command: ");
         }
         int polled = poll(pfds.data(), pfds.size(), POLL_TIMEOUT);
         if (polled > 0)
         {
-            for (auto it = pfds.begin(); it != pfds.end(); ++it)
+            for (struct pollfd it : pfds)
             {
-                if (it->revents & POLLIN)
+                if (it.revents & POLLIN)
                 {
-                    string input = handle_client_input(it->fd); // will check what is the input and send the apropriate output.
-                    handle_user_input(it->fd, &g, input);
+                    string input;
+                    try
+                    {
+                        input = receive_message(it.fd);
+                    }
+                    catch (const std::runtime_error &e)
+                    {
+                        std::cerr << e.what() << '\n';
+                        close(it.fd);
+                        continue;
+                    }
+                    input.pop_back(); // Remove the newline character
+                    try
+                    {
+                        if (handle_user_input(it.fd, &g, input))
+                        {
+                            close(it.fd);
+                            pfds.erase(std::remove_if(pfds.begin(), pfds.end(), [it](struct pollfd pfd)
+                                                      { return pfd.fd == it.fd; }));
+                        }
+                        else
+                        {
+                            send_message(it.fd, "Enter command: ");
+                        }
+                    }
+                    catch (const std::runtime_error &e)
+                    {
+                        std::cerr << e.what() << '\n';
+                        close(it.fd);
+                        continue;
+                    }
+                    catch (const std::invalid_argument &e)
+                    {
+                        std::cerr << e.what() << '\n';
+                        continue;
+                    }
+                }
+                if (it.revents & POLLNVAL)
+                {
+                    close(it.fd);
+                    pfds.erase(std::remove_if(pfds.begin(), pfds.end(), [it](struct pollfd pfd)
+                                              { return pfd.fd == it.fd; }));
                 }
             }
         }
     }
 
-    for (struct pollfd pfd : pfds)
-    {
-        close(pfd.fd);
-    }
     close(server_fd);
 }

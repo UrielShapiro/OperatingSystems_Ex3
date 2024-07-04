@@ -9,7 +9,7 @@ GRAPH_IMPL = AdjacencyGraph
 
 HEADERS = $(GRAPH).hpp $(GRAPH_IMPL).hpp $(LIB).hpp
 
-EXE = KosarajuServer
+EXE = Kosaraju
 
 all: $(EXE)
 
