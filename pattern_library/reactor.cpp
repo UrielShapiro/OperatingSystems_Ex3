@@ -50,7 +50,9 @@ bool Reactor::remove_fd(int fd)
 
 void Reactor::start()
 {
+    running_mutex.lock();
     running = true;
+    running_mutex.unlock();
     thread = new std::thread(&Reactor::reactor_main, this);
 }
 
