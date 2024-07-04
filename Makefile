@@ -30,3 +30,8 @@ Q6/Kosaraju: Q6/main.o $(BUILD_DIR)/pattern_library.a $(BUILD_DIR)/kosaraju.o $(
 	$(CXX) $(CXXFLAGS) -o $@ $^
 
 Q6/main.o: Q6/main.cpp $(INCLUDE_DIR)/AdjacencyGraph.hpp $(INCLUDE_DIR)/Graph.hpp $(INCLUDE_DIR)/kosaraju.hpp $(LIB_DIR)/reactor.cpp
+
+clean:
+	rm -rf $(BUILD_DIR) Q6/Kosaraju	Q6/*.o
+
+.PHONY: clean all
