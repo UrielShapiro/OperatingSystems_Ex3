@@ -7,7 +7,7 @@ void print_from_fd(int fd)
 {
     char c;
     read(fd, &c, sizeof(c));
-    std::cout << "Read " << c;
+    std::cout << "Read \"" << c << '\"';
 }
 
 int main()
