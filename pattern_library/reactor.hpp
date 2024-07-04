@@ -1,8 +1,13 @@
 <<<<<<< HEAD
+<<<<<<< HEAD
 #pragma once
 
 =======
 >>>>>>> e2c1457 (Renamed Q5 to pattern_library)
+=======
+#pragma once
+
+>>>>>>> d0feb7c (Initial proactor impl)
 #include <functional>
 #include <map>
 #include <thread>
