@@ -1,4 +1,4 @@
-#include "AdjacencyGraph.hpp"
+#include "../include/AdjacencyGraph.hpp"
 #include <stdexcept>
 
 using std::vector, std::pair;

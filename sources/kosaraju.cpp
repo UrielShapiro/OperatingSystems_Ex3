@@ -1,4 +1,4 @@
-#include "kosaraju.hpp"
+#include "../include/kosaraju.hpp"
 #include <set>
 #include <map>
 #include <algorithm>

@@ -1,40 +1,28 @@
 #include <iostream>
 #include <vector>
-#include <algorithm>
-#include <utility>
-#include <set>
-#include <string>
-#include <sstream>
-#include <unistd.h>
-#include <arpa/inet.h>
 #include <poll.h>
-#include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <unistd.h>
+#include <stdexcept>
+#include <string>
+#include <set>
+#include <algorithm>
+#include <sstream>
 #include <fcntl.h>
-#include "../include/Graph.hpp"
+#include "../pattern_library/reactor.hpp"
 #include "../include/kosaraju.hpp"
-
-#define GRAPH_IMPL AdjacencyGraph
+#include "../include/Graph.hpp"
 #include "../include/AdjacencyGraph.hpp"
 
 #define PORT 9034
 #define MAX_USERS 5
-#define POLL_TIMEOUT 10
 #define MAX_SEGMENT_SIZE 65535
-
-// #define DEBUG
 
 using std::cin, std::cout, std::set, std::string;
 
-/**
- * @brief Send a message to the client
- * @return true if an error occurred, false otherwise
- */
-bool send_message(int fd, string message)
-{
-    return write(fd, message.c_str(), message.length() + 1) < 0;
-}
+Graph *g = nullptr;
+Reactor reactor;
 
 /**
  * @brief Receive a message from the client
@@ -57,18 +45,19 @@ string receive_message(int fd)
     return buffer;
 }
 
-bool handle_user_input(int fd, Graph **g, std::string input)
+bool send_message(int fd, string message)
 {
-    if (!g)
-    {
-        throw std::invalid_argument("Graph pointer is NULL");
-    }
+    return write(fd, message.c_str(), message.length() + 1) < 0;
+}
+
+bool handle_user_input(int fd, string input)
+{
     std::istringstream is(input);
-    std::string command;
+    string command;
     std::getline(is, command, ' ');
     if (command == "Kosaraju")
     {
-        if (!*g)
+        if (!g)
         {
             if (send_message(fd, "Please create a graph using Newgraph <n>,<m> first\n"))
             {
@@ -76,7 +65,7 @@ bool handle_user_input(int fd, Graph **g, std::string input)
             }
             return false;
         }
-        auto comps = kosaraju(**g);
+        auto comps = kosaraju(*g);
         string message;
         message += "The strongly connected components are: \n";
         for (auto comp : comps)
@@ -106,8 +95,8 @@ bool handle_user_input(int fd, Graph **g, std::string input)
             }
         }
         size_t n = strtoull(param1.c_str(), nullptr, 10), m = strtoull(param2.c_str(), nullptr, 10);
-        if (*g)
-            delete *g;
+        if (g)
+            delete g;
         std::vector<std::pair<vertex, vertex>> edges;
         for (size_t i = 0; i < m; ++i) // FIXME
         {
@@ -120,12 +109,12 @@ bool handle_user_input(int fd, Graph **g, std::string input)
             cout << "Parsed edge: " << src << " " << dst << std::endl;
             edges.push_back(std::make_pair(src, dst));
         }
-        *g = new GRAPH_IMPL(n, edges);
+        g = new AdjacencyGraph(n, edges);
         return false;
     }
     else if (command == "Newedge")
     {
-        if (!*g)
+        if (!g)
         {
             if (send_message(fd, "Please create a graph using Newgraph <n>,<m> first\n"))
             {
@@ -144,7 +133,7 @@ bool handle_user_input(int fd, Graph **g, std::string input)
             }
         }
         vertex src = strtoull(param1.c_str(), nullptr, 10), dst = strtoull(param2.c_str(), nullptr, 10);
-        if (!(*g)->add_edge(src, dst))
+        if (!(g)->add_edge(src, dst))
         {
             if (send_message(fd, "Edge already exists\n"))
             {
@@ -162,7 +151,7 @@ bool handle_user_input(int fd, Graph **g, std::string input)
     }
     else if (command == "Removeedge")
     {
-        if (!*g)
+        if (!g)
         {
             if (send_message(fd, "Please create a graph using Newgraph <n>,<m> first\n"))
             {
@@ -181,7 +170,7 @@ bool handle_user_input(int fd, Graph **g, std::string input)
             }
         }
         vertex src = strtoull(param1.c_str(), nullptr, 10), dst = strtoull(param2.c_str(), nullptr, 10);
-        if (!(*g)->remove_edge(src, dst))
+        if (!(g)->remove_edge(src, dst))
         {
             if (send_message(fd, "Edge does not exist\n"))
             {
@@ -200,6 +189,7 @@ bool handle_user_input(int fd, Graph **g, std::string input)
     else if (command == "Exit")
     {
         std::cout << "Connection closed by the client" << std::endl;
+        reactor.remove_fd(fd);
         return true;
     }
     else
@@ -212,9 +202,25 @@ bool handle_user_input(int fd, Graph **g, std::string input)
     }
 }
 
+void read_input(int fd)
+{
+    string input;
+    try
+    {
+        input = receive_message(fd);
+    }
+    catch (const std::runtime_error &e)
+    {
+        cout << e.what() << std::endl;
+        close(fd);
+        return;
+    }
+    handle_user_input(fd, input);
+}
+
 int main()
 {
-    Graph *g = nullptr;
+    size_t clients_count = 0;
 
     int server_fd = -1;
     int new_socket = -1;
@@ -231,7 +237,7 @@ int main()
         exit(EXIT_FAILURE);
     }
 
-    // Forcefully attaching socket to the port 8080
+    // Forcefully attaching socket to the port 9034
     if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt)))
     {
         perror("setsockopt");
@@ -260,29 +266,6 @@ int main()
         close(server_fd);
         exit(EXIT_FAILURE);
     }
-    // Accept an incoming connection
-    if ((new_socket = accept(server_fd, (struct sockaddr *)&address, (socklen_t *)&addrlen)) < 0)
-    {
-        perror("accept");
-        close(server_fd);
-        exit(EXIT_FAILURE);
-    }
-    if (new_socket > 0)
-    {
-        pfds.push_back((struct pollfd){
-            .fd = new_socket,
-            .events = POLLIN,
-            .revents = 0,
-        });
-        if (send_message(new_socket, "Enter command: "))
-        {
-            close(new_socket);
-            close(server_fd);
-            throw std::runtime_error("Error sending a message to the client");
-        }
-    }
-
-    std::cout << "Server is listening on port " << PORT << std::endl;
 
     // Set the socket to non-blocking mode
     if (fcntl(server_fd, F_SETFL, O_NONBLOCK) < 0)
@@ -291,8 +274,10 @@ int main()
         close(server_fd);
         exit(EXIT_FAILURE);
     }
+    std::cout << "Server is listening on port " << PORT << std::endl;
 
-    while (!pfds.empty())
+    reactor.start();
+    while (true)
     {
         new_socket = -1;
         // Accept an incoming connection
@@ -300,70 +285,21 @@ int main()
         {
             perror("accept");
             close(server_fd);
+            reactor.stop();
             exit(EXIT_FAILURE);
         }
+
         if (new_socket > 0)
         {
-            pfds.push_back(pollfd{
-                .fd = new_socket,
-                .events = POLLIN,
-                .revents = 0,
-            });
-            send_message(new_socket, "Enter command: ");
-        }
-        int polled = poll(pfds.data(), pfds.size(), POLL_TIMEOUT);
-        if (polled > 0)
-        {
-            for (struct pollfd it : pfds)
+            reactor.add_fd(new_socket, read_input);
+            clients_count++;
+            if (send_message(new_socket, "Enter command: "))
             {
-                if (it.revents & POLLIN)
-                {
-                    string input;
-                    try
-                    {
-                        input = receive_message(it.fd);
-                    }
-                    catch (const std::runtime_error &e)
-                    {
-                        std::cerr << e.what() << '\n';
-                        close(it.fd);
-                        continue;
-                    }
-                    input.pop_back(); // Remove the newline character
-                    try
-                    {
-                        if (handle_user_input(it.fd, &g, input))
-                        {
-                            close(it.fd);
-                            pfds.erase(std::remove_if(pfds.begin(), pfds.end(), [it](struct pollfd pfd)
-                                                      { return pfd.fd == it.fd; }));
-                        }
-                        else
-                        {
-                            send_message(it.fd, "Enter command: ");
-                        }
-                    }
-                    catch (const std::runtime_error &e)
-                    {
-                        std::cerr << e.what() << '\n';
-                        close(it.fd);
-                        continue;
-                    }
-                    catch (const std::invalid_argument &e)
-                    {
-                        std::cerr << e.what() << '\n';
-                        continue;
-                    }
-                }
-                if (it.revents & POLLNVAL)
-                {
-                    close(it.fd);
-                    pfds.erase(std::remove_if(pfds.begin(), pfds.end(), [it](struct pollfd pfd)
-                                              { return pfd.fd == it.fd; }));
-                }
+                close(new_socket);
+                close(server_fd);
+                reactor.stop();
+                throw std::runtime_error("Error sending a message to the client");
             }
         }
     }
-
-    close(server_fd);
 }
