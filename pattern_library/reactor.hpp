@@ -1,11 +1,15 @@
+<<<<<<< HEAD
 #pragma once
 
+=======
+>>>>>>> e2c1457 (Renamed Q5 to pattern_library)
 #include <functional>
 #include <map>
 #include <thread>
 #include <mutex>
 #include <vector>
 
+<<<<<<< HEAD
 /**
  * This class implements the reactor design pattern.
  * The reactor saves a list of file descriptors and handlers.
@@ -19,6 +23,10 @@ public:
      * The type used as a handler for reactions to file descriptor events.
      * The function receives as an argument the file descriptor on which the event occured.
      */
+=======
+class Reactor
+{
+>>>>>>> e2c1457 (Renamed Q5 to pattern_library)
     using Handler = std::function<void (int)>;
 private:
     bool running;
@@ -30,6 +38,7 @@ private:
     std::mutex vectors_mutex;
     void reactor_main();
 public:
+<<<<<<< HEAD
     /**
      * Creates a new reactor, intially not running, you can add file descriptors to it and use start() to start it.
      */
@@ -53,5 +62,12 @@ public:
     /**
      * Removes from the reactor the file descriptor and its handler.
      */
+=======
+    Reactor();
+    ~Reactor();
+    void start();
+    void stop();
+    bool add_fd(int fd, Handler handler);
+>>>>>>> e2c1457 (Renamed Q5 to pattern_library)
     bool remove_fd(int fd);
 };
