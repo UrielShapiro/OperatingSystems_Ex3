@@ -7,7 +7,6 @@ LIB = kosaraju
 
 GRAPH = Graph
 GRAPH_IMPL = AdjacencyGraph
-Profiling = ProfilingTest
 
 GRAPHS = AdjacencyGraph ListGraph
 # GRAPH_IMPL = ListGraph
