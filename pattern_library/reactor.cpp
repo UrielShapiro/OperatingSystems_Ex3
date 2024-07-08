@@ -109,6 +109,7 @@ void Reactor::reactor_main()
     {
         std::vector<std::variant<handler_action, remove_action>> actions;
         {
+            std::lock_guard<std::mutex> vectors_guard(vectors_mutex);
             poll(pfds.data(), pfds.size(), 0);
             for (size_t i = 0; i < this->fds_count; ++i)
             {
