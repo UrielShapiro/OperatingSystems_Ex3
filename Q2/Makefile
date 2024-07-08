@@ -2,31 +2,28 @@ CXX = g++
 CXXFLAGS = -Wall -Wextra -Werror -g -std=c++17
 PROFILING = ProfilingTest
 PROFILINGFLAGS = -pg
-LIB_DIR = ../graph_library
+GRAPH_DIR = ../graph_library
+GRAPH_LIB = libgraph
 BUILD_DIR = ../build
 
-all: profile
+all: $(PROFILING)
 
 $(BUILD_DIR):
-	-mkdir $@
+	-mkdir -p $@
 
-$(BUILD_DIR)/AdjacencyGraph.o: $(LIB_DIR)/AdjacencyGraph.cpp $(LIB_DIR)/AdjacencyGraph.hpp $(LIB_DIR)/Graph.hpp
-	$(CXX) $(CXXFLAGS) -c $< -o $@
-
-$(BUILD_DIR)/ListGraph.o: $(LIB_DIR)/ListGraph.cpp $(LIB_DIR)/ListGraph.hpp $(LIB_DIR)/Graph.hpp
-	$(CXX) $(CXXFLAGS) -c $< -o $@
-
-
-$(BUILD_DIR)/kosaraju.o: $(LIB_DIR)/kosaraju.cpp $(LIB_DIR)/kosaraju.hpp
-	$(CXX) $(CXXFLAGS) -c -o $@ $<
-
-profile: $(PROFILING)		
+gprof: $(PROFILING)
 	./$(PROFILING)
 	gprof ./$(PROFILING) > GraphProfiling.txt
 	-rm -rf gmon.out
 
-$(PROFILING): $(PROFILING).cpp $(BUILD_DIR)/ListGraph.o $(BUILD_DIR)/AdjacencyGraph.o $(BUILD_DIR)/kosaraju.o	
+$(PROFILING): $(BUILD_DIR)/$(PROFILING).o $(BUILD_DIR)/$(GRAPH_LIB).a | $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) $(PROFILINGFLAGS) -o $@ $^
 
+$(BUILD_DIR)/$(PROFILING).o: $(PROFILING).cpp | $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(BUILD_DIR)/$(GRAPH_LIB).a:
+	make -C $(GRAPH_DIR)
+
 clean:
-	rm -rf *.o profile $(Profiling) gmon.out
+	rm -rf *.o profile $(PROFILING) gmon.out GraphProfiling.txt
