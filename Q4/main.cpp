@@ -12,11 +12,11 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <fcntl.h>
-#include "../include/Graph.hpp"
-#include "../include/kosaraju.hpp"
+#include "../graph_library/Graph.hpp"
+#include "../graph_library/kosaraju.hpp"
 
 #define GRAPH_IMPL AdjacencyGraph
-#include "../include/AdjacencyGraph.hpp"
+#include "../graph_library/AdjacencyGraph.hpp"
 
 #define PORT 9034
 #define MAX_USERS 5

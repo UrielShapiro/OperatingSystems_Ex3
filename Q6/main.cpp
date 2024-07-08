@@ -11,9 +11,9 @@
 #include <sstream>
 #include <fcntl.h>
 #include "../pattern_library/reactor.hpp"
-#include "../include/kosaraju.hpp"
-#include "../include/Graph.hpp"
-#include "../include/AdjacencyGraph.hpp"
+#include "../graph_library/kosaraju.hpp"
+#include "../graph_library/Graph.hpp"
+#include "../graph_library/AdjacencyGraph.hpp"
 
 #define PORT 9034
 #define MAX_USERS 5
@@ -189,6 +189,7 @@ bool handle_user_input(int fd, string input)
     else if (command == "Exit")
     {
         std::cout << "Connection closed by the client" << std::endl;
+        close(fd);
         reactor.remove_fd(fd);
         return true;
     }
@@ -202,7 +203,7 @@ bool handle_user_input(int fd, string input)
     }
 }
 
-void read_input(int fd)
+void client_main(int fd)
 {
     string input;
     try
@@ -267,8 +268,6 @@ int main()
         exit(EXIT_FAILURE);
     }
 
-    std::vector<struct pollfd> pfds;
-
     // Listen for incoming connections
     if (listen(server_fd, MAX_USERS) < 0)
     {
@@ -302,7 +301,7 @@ int main()
         if (new_socket > 0)
         {
             std::cout << "New connection accepted" << std::endl;
-            reactor.add_fd(new_socket, read_input);
+            reactor.add_fd(new_socket, client_main);
             clients_count++;
             if (send_message(new_socket, "Enter command: "))
             {
@@ -313,4 +312,5 @@ int main()
             }
         }
     }
+    return 0;
 }
