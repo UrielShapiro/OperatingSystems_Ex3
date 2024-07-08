@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <unistd.h>
 #include <iostream>
+#include <variant>
 
 #include "reactor.hpp"
 
@@ -18,7 +19,7 @@ Reactor::~Reactor()
 
 bool Reactor::add_fd(int fd, Handler handler)
 {
-    this->vectors_mutex.lock();
+    std::lock_guard<std::mutex> vectors_guard(vectors_mutex);
     if (pfds.end() != std::find_if(pfds.begin(), pfds.end(), [fd](struct pollfd pfd)
                                    { return pfd.fd == fd; }))
     {
@@ -30,7 +31,6 @@ bool Reactor::add_fd(int fd, Handler handler)
         .revents = 0});
     this->handlers.push_back(handler);
     this->fds_count += 1;
-    this->vectors_mutex.unlock();
     return true;
 }
 
@@ -41,7 +41,7 @@ bool Reactor::remove_fd(int fd)
     std::cout << "fds_count: " << fds_count << std::endl;
     std::cout << "pfds.size: " << pfds.size() << std::endl;
 #endif
-    // this->vectors_mutex.lock();  // Problematic line
+    std::lock_guard<std::mutex> vectors_guard(vectors_mutex);
     for (size_t i = 0; i < fds_count; ++i)
     {
 #ifdef DEBUG
@@ -55,20 +55,18 @@ bool Reactor::remove_fd(int fd)
             pfds.erase(pfds.begin() + i);
             handlers.erase(handlers.begin() + i);
             fds_count -= 1;
-            close(fd); // Uriel's addition - Not working
-            this->vectors_mutex.unlock();
             return true;
         }
     }
-    this->vectors_mutex.unlock();
     return false;
 }
 
 void Reactor::start()
 {
-    running_mutex.lock();
-    running = true;
-    running_mutex.unlock();
+    {
+        std::lock_guard<std::mutex> running_guard(running_mutex);
+        running = true;
+    }
     thread = new std::thread(&Reactor::reactor_main, this);
 }
 
@@ -76,32 +74,62 @@ void Reactor::stop()
 {
     if (!thread)
         return;
-    running_mutex.lock();
-    running = false;
-    running_mutex.unlock();
+    {
+        std::lock_guard<std::mutex> running_guard(running_mutex);
+        running = false;
+    }
     thread->join();
     delete thread;
 }
 
+struct handler_action
+{
+    Reactor::Handler handler;
+    int param;
+    void operator()()
+    {
+        handler(param);
+    }
+};
+
+struct remove_action
+{
+    Reactor *reactor;
+    int param;
+    void operator()()
+    {
+        reactor->remove_fd(param);
+    }
+};
+
 void Reactor::reactor_main()
 {
-    while ((this->running_mutex.lock(), this->running))
+    bool still_running = running;
+    while (still_running)
     {
-        this->running_mutex.unlock();
-        this->vectors_mutex.lock();
-        poll(pfds.data(), pfds.size(), 0);
-        for (size_t i = 0; i < this->fds_count; ++i)
+        std::vector<std::variant<handler_action, remove_action>> actions;
         {
-            if (pfds[i].revents & POLLIN)
+            poll(pfds.data(), pfds.size(), 0);
+            for (size_t i = 0; i < this->fds_count; ++i)
             {
-                handlers[i](pfds[i].fd);
-            }
-            else if (pfds[i].revents & POLLNVAL)
-            {
-                this->remove_fd(pfds[i].fd);
+                if (pfds[i].revents & POLLIN)
+                {
+                    actions.push_back(handler_action{handlers[i], pfds[i].fd});
+                }
+                else if (pfds[i].revents & POLLNVAL)
+                {
+                    actions.push_back(remove_action{this, pfds[i].fd});
+                }
             }
         }
-        this->vectors_mutex.unlock();
+
+        for (auto &action : actions)
+            std::visit([](auto &arg)
+                       { arg(); }, action);
+
+        {
+            std::lock_guard<std::mutex> running_guard(running_mutex);
+            still_running = running;
+        }
     }
-    this->running_mutex.unlock();
 }
