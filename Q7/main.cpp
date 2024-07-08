@@ -2,33 +2,37 @@
 #include <vector>
 #include <algorithm>
 #include <utility>
+#include <functional>
 #include <set>
 #include <string>
 #include <sstream>
 #include <unistd.h>
 #include <arpa/inet.h>
-#include <poll.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <fcntl.h>
+#include <map>
 #include <thread>
 #include <mutex>
-#include "../include/Graph.hpp"
-#include "../include/kosaraju.hpp"
+#include <shared_mutex>
+#include "../graph_library/Graph.hpp"
+#include "../graph_library/kosaraju.hpp"
 
 #define GRAPH_IMPL AdjacencyGraph
-#include "../include/AdjacencyGraph.hpp"
+#include "../graph_library/AdjacencyGraph.hpp"
 
 #define PORT 9034
 #define MAX_USERS 5
-#define POLL_TIMEOUT 10
 #define MAX_SEGMENT_SIZE 65535
+
+#define DEBUG
 
 using std::cin, std::cout, std::set, std::string;
 
 Graph *g = nullptr;
-std::mutex graph_mutex;
+std::shared_mutex graph_mutex;
+std::map<int, std::thread *> threads;
 
 /**
  * @brief Send a message to the client
@@ -60,26 +64,33 @@ string receive_message(int fd)
     return buffer;
 }
 
+/**
+ * @brief Handle the user input
+ * @return true if the client requested to close the connection, false otherwise
+ */
 bool handle_user_input(int fd, string input)
 {
-    if (!g)
-    {
-        throw std::invalid_argument("Graph pointer is NULL");
-    }
     std::istringstream is(input);
     std::string command;
     std::getline(is, command, ' ');
     if (command == "Kosaraju")
     {
-        if (!*g)
         {
-            if (send_message(fd, "Please create a graph using Newgraph <n>,<m> first\n"))
+            std::shared_lock<std::shared_mutex> graph_lock(graph_mutex);
+            if (!g)
             {
-                throw std::runtime_error("Error sending a message to the client");
+                if (send_message(fd, "Please create a graph using Newgraph <n>,<m> first\n"))
+                {
+                    throw std::runtime_error("Error sending a message to the client");
+                }
+                return false;
             }
-            return false;
         }
-        auto comps = kosaraju(**g);
+        std::set<std::set<vertex>> comps;
+        {
+            std::shared_lock<std::shared_mutex> graph_lock(graph_mutex);
+            comps = kosaraju(*g);
+        }
         string message;
         message += "The strongly connected components are: \n";
         for (auto comp : comps)
@@ -109,32 +120,40 @@ bool handle_user_input(int fd, string input)
             }
         }
         size_t n = strtoull(param1.c_str(), nullptr, 10), m = strtoull(param2.c_str(), nullptr, 10);
-        if (*g)
-            delete *g;
-        std::vector<std::pair<vertex, vertex>> edges;
-        for (size_t i = 0; i < m; ++i) // FIXME
         {
-            vertex src, dst;
-            string received_edge = receive_message(fd);
-            cout << "Received edge: " << received_edge << std::endl;
-            char *space;
-            src = strtoull(received_edge.c_str(), &space, 10);
-            dst = strtoull(space + 1, nullptr, 10);
-            cout << "Parsed edge: " << src << " " << dst << std::endl;
-            edges.push_back(std::make_pair(src, dst));
+            std::unique_lock<std::shared_mutex> graph_lock(graph_mutex);
+
+            if (g)
+                delete g;
+
+            std::vector<std::pair<vertex, vertex>> edges;
+            for (size_t i = 0; i < m; ++i)
+            {
+                vertex src, dst;
+                string received_edge = receive_message(fd);
+                cout << "Received edge: " << received_edge << std::endl;
+                char *space;
+                src = strtoull(received_edge.c_str(), &space, 10);
+                dst = strtoull(space + 1, nullptr, 10);
+                cout << "Parsed edge: " << src << " " << dst << std::endl;
+                edges.push_back(std::make_pair(src, dst));
+            }
+            g = new GRAPH_IMPL(n, edges);
         }
-        *g = new GRAPH_IMPL(n, edges);
         return false;
     }
     else if (command == "Newedge")
     {
-        if (!*g)
         {
-            if (send_message(fd, "Please create a graph using Newgraph <n>,<m> first\n"))
+            std::shared_lock<std::shared_mutex> graph_lock(graph_mutex);
+            if (!g)
             {
-                throw std::runtime_error("Error sending a message to the client");
+                if (send_message(fd, "Please create a graph using Newgraph <n>,<m> first\n"))
+                {
+                    throw std::runtime_error("Error sending a message to the client");
+                }
+                return false;
             }
-            return false;
         }
         std::string param1, param2;
         std::getline(is, param1, ',');
@@ -147,31 +166,37 @@ bool handle_user_input(int fd, string input)
             }
         }
         vertex src = strtoull(param1.c_str(), nullptr, 10), dst = strtoull(param2.c_str(), nullptr, 10);
-        if (!(*g)->add_edge(src, dst))
         {
-            if (send_message(fd, "Edge already exists\n"))
+            std::unique_lock<std::shared_mutex> graph_lock(graph_mutex);
+            if (!g->add_edge(src, dst))
             {
-                throw std::runtime_error("Error sending a message to the client");
+                if (send_message(fd, "Edge already exists\n"))
+                {
+                    throw std::runtime_error("Error sending a message to the client");
+                }
             }
-        }
-        else
-        {
-            if (send_message(fd, "Edge was created successfuly\n"))
+            else
             {
-                throw std::runtime_error("Error sending a message to the client");
+                if (send_message(fd, "Edge was created successfuly\n"))
+                {
+                    throw std::runtime_error("Error sending a message to the client");
+                }
             }
         }
         return false;
     }
     else if (command == "Removeedge")
     {
-        if (!*g)
         {
-            if (send_message(fd, "Please create a graph using Newgraph <n>,<m> first\n"))
+            std::shared_lock<std::shared_mutex> graph_lock(graph_mutex);
+            if (!g)
             {
-                throw std::runtime_error("Error sending a message to the client");
+                if (send_message(fd, "Please create a graph using Newgraph <n>,<m> first\n"))
+                {
+                    throw std::runtime_error("Error sending a message to the client");
+                }
+                return false;
             }
-            return false;
         }
         std::string param1, param2;
         std::getline(is, param1, ',');
@@ -184,18 +209,21 @@ bool handle_user_input(int fd, string input)
             }
         }
         vertex src = strtoull(param1.c_str(), nullptr, 10), dst = strtoull(param2.c_str(), nullptr, 10);
-        if (!(*g)->remove_edge(src, dst))
         {
-            if (send_message(fd, "Edge does not exist\n"))
+            std::unique_lock<std::shared_mutex> graph_lock(graph_mutex);
+            if (!g->remove_edge(src, dst))
             {
-                throw std::runtime_error("Error sending a message to the client");
+                if (send_message(fd, "Edge does not exist\n"))
+                {
+                    throw std::runtime_error("Error sending a message to the client");
+                }
             }
-        }
-        else
-        {
-            if (send_message(fd, "Edge was removed successfuly\n"))
+            else
             {
-                throw std::runtime_error("Error sending a message to the client");
+                if (send_message(fd, "Edge was removed successfuly\n"))
+                {
+                    throw std::runtime_error("Error sending a message to the client");
+                }
             }
         }
         return false;
@@ -215,26 +243,40 @@ bool handle_user_input(int fd, string input)
     }
 }
 
-void read_input(int fd)
+void client_main(int fd)
 {
-    string input;
-    try
+    bool run = true;
+
+    std::function<void(int)> error_handler = [&](int fd)
     {
-        input = receive_message(fd);
-    }
-    catch (const std::runtime_error &e)
-    {
-        cout << e.what() << std::endl;
         close(fd);
-        return;
-    }
-    input.pop_back(); // Remove the newline character
-    handle_user_input(fd, input);
-    if (send_message(fd, "Enter command: "))
+        delete threads[fd];
+        threads.erase(fd);
+        run = false;
+    };
+
+    while (run)
     {
-        std::cerr << ("Error sending a message to the client");
-        close(fd);
-        return;
+        string input;
+        if (send_message(fd, "Enter command: "))
+        {
+            std::cerr << ("Error sending a message to the client");
+            error_handler(fd);
+        }
+        try
+        {
+            input = receive_message(fd);
+        }
+        catch (const std::runtime_error &e)
+        {
+            cout << e.what() << std::endl;
+            error_handler(fd);
+        }
+        input.pop_back(); // Remove the newline character
+        if (handle_user_input(fd, input))
+        {
+            error_handler(fd);
+        }
     }
 }
 
@@ -275,35 +317,12 @@ int main()
         exit(EXIT_FAILURE);
     }
 
-    std::vector<struct pollfd> pfds;
-
     // Listen for incoming connections
     if (listen(server_fd, MAX_USERS) < 0)
     {
         perror("listen");
         close(server_fd);
         exit(EXIT_FAILURE);
-    }
-    // Accept an incoming connection
-    if ((new_socket = accept(server_fd, (struct sockaddr *)&address, (socklen_t *)&addrlen)) < 0)
-    {
-        perror("accept");
-        close(server_fd);
-        exit(EXIT_FAILURE);
-    }
-    if (new_socket > 0)
-    {
-        pfds.push_back((struct pollfd){
-            .fd = new_socket,
-            .events = POLLIN,
-            .revents = 0,
-        });
-        if (send_message(new_socket, "Enter command: "))
-        {
-            close(new_socket);
-            close(server_fd);
-            throw std::runtime_error("Error sending a message to the client");
-        }
     }
 
     std::cout << "Server is listening on port " << PORT << std::endl;
@@ -316,7 +335,7 @@ int main()
         exit(EXIT_FAILURE);
     }
 
-    while (!pfds.empty())
+    while (true)
     {
         new_socket = -1;
         // Accept an incoming connection
@@ -328,69 +347,10 @@ int main()
         }
         if (new_socket > 0)
         {
-            pfds.push_back(pollfd{
-                .fd = new_socket,
-                .events = POLLIN,
-                .revents = 0,
-            });
-            send_message(new_socket, "Enter command: ");
-        }
-        int polled = poll(pfds.data(), pfds.size(), POLL_TIMEOUT);
-        if (polled > 0)
-        {
-            for (struct pollfd it : pfds)
-            {
-                if (it.revents & POLLIN)
-                {
-                    graph_mutex.lock();
-                    string input;
-                    try
-                    {
-                        input = receive_message(it.fd);
-                    }
-                    catch (const std::runtime_error &e)
-                    {
-                        std::cerr << e.what() << '\n';
-                        close(it.fd);
-                        continue;
-                    }
-                    input.pop_back(); // Remove the newline character
-                    try
-                    {
-                        if (handle_user_input(it.fd, &g, input))
-                        {
-                            close(it.fd);
-                            pfds.erase(std::remove_if(pfds.begin(), pfds.end(), [it](struct pollfd pfd)
-                                                      { return pfd.fd == it.fd; }));
-                        }
-                        else
-                        {
-                            send_message(it.fd, "Enter command: ");
-                        }
-                    }
-                    catch (const std::runtime_error &e)
-                    {
-                        std::cerr << e.what() << '\n';
-                        close(it.fd);
-                        continue;
-                    }
-                    catch (const std::invalid_argument &e)
-                    {
-                        std::cerr << e.what() << '\n';
-                        continue;
-                    }
-                    graph_mutex.unlock();
-                }
-
-                if (it.revents & POLLNVAL)
-                {
-                    close(it.fd);
-                    pfds.erase(std::remove_if(pfds.begin(), pfds.end(), [it](struct pollfd pfd)
-                                              { return pfd.fd == it.fd; }));
-                }
-            }
+            std::cout << "New connection accepted" << std::endl;
+            threads[new_socket] = new std::thread(&client_main, new_socket);
+            threads[new_socket]->detach();
         }
     }
-
     close(server_fd);
 }
