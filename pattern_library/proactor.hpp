@@ -18,7 +18,6 @@ private:
     std::thread *main_thread;
     std::vector<std::thread> worker_threads;
     std::vector<struct pollfd> pfds;
-    std::mutex pfds_mutex;
     void proactor_main();
 
 public:
