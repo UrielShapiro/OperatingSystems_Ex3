@@ -1,37 +1,22 @@
 CXX = g++
 CXXFLAGS = -Wall -Wextra -Werror -ggdb
 
-SRCS_DIR = sources
+QS = Q2 Q3 Q6 Q7
+QS_all = $(foreach q, $(QS), $(q)_all)
+QS_clean = $(foreach q, $(QS), $(q)_clean)
+
 BUILD_DIR = ./build
 LIB_DIR = ./pattern_library
-INCLUDE_DIR = ./include
+GRAPH_DIR = ./graph_library
 
-all: Q6/Kosaraju
+all: $(QS_all)
 
-$(BUILD_DIR):
-	-mkdir $@
+$(QS_all):
+	$(MAKE) -C $(@:_all=) all
 
-$(BUILD_DIR)/reactor.o: $(LIB_DIR)/reactor.cpp $(LIB_DIR)/reactor.hpp $(BUILD_DIR)
-	$(CXX) $(CXXFLAGS) -c -o $@ $<
+$(QS_clean):
+	$(MAKE) -C $(@:_clean=) clean
 
-# $(BUILD_DIR)/proactor.o: $(LIB_DIR)/proactor.cpp $(LIB_DIR)/proactor.hpp $(BUILD_DIR)
-# 	$(CXX) $(CXXFLAGS) -c -o $@ $<
+clean: $(QS_clean)
 
-$(BUILD_DIR)/kosaraju.o: $(SRCS_DIR)/kosaraju.cpp $(INCLUDE_DIR)/kosaraju.hpp
-	$(CXX) $(CXXFLAGS) -c -o $@ $<
-
-$(BUILD_DIR)/AdjacencyGraph.o: $(SRCS_DIR)/AdjacencyGraph.cpp $(INCLUDE_DIR)/Graph.hpp $(INCLUDE_DIR)/AdjacencyGraph.hpp
-	$(CXX) $(CXXFLAGS) -c -o $@ $<
-
-$(BUILD_DIR)/pattern_library.a: $(BUILD_DIR)/reactor.o # $(BUILD_DIR)/proactor.o
-	ar -crs $@ $^
-
-Q6/Kosaraju: Q6/main.o $(BUILD_DIR)/pattern_library.a $(BUILD_DIR)/kosaraju.o $(BUILD_DIR)/AdjacencyGraph.o
-	$(CXX) $(CXXFLAGS) -o $@ $^
-
-Q6/main.o: Q6/main.cpp $(INCLUDE_DIR)/AdjacencyGraph.hpp $(INCLUDE_DIR)/Graph.hpp $(INCLUDE_DIR)/kosaraju.hpp $(LIB_DIR)/reactor.cpp
-
-clean:
-	rm -rf $(BUILD_DIR) Q6/Kosaraju	Q6/*.o
-
-.PHONY: clean all
+.PHONY: clean all $(QS_all) $(QS_clean)
