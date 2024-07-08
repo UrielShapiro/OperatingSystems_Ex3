@@ -104,7 +104,11 @@ struct remove_action
 
 void Reactor::reactor_main()
 {
-    bool still_running = running;
+    bool still_running;
+    {
+        std::lock_guard<std::mutex> running_guard(running_mutex);
+        still_running = running;
+    }
     while (still_running)
     {
         std::vector<std::variant<handler_action, remove_action>> actions;
