@@ -12,13 +12,8 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <fcntl.h>
-<<<<<<< HEAD
 #include "../include/Graph.hpp"
 #include "../include/kosaraju.hpp"
-=======
-#include "Graph.hpp"
-#include "kosaraju.hpp"
->>>>>>> 425a929 (Done with Q4)
 
 #define GRAPH_IMPL AdjacencyGraph
 #include "../include/AdjacencyGraph.hpp"
