@@ -1,6 +1,5 @@
 CXX = g++
 CXXFLAGS = -Wall -Wextra -Werror -g -std=c++17
-PROFILINGFLAGS = -pg
 
 MAIN = main
 LIB = kosaraju
@@ -28,15 +27,7 @@ $(LIB).o: $(LIB).cpp $(LIB).hpp
 %Graph.o: %Graph.cpp %Graph.hpp $(GRAPH).hpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-profile: $(Profiling)
-	./$(Profiling)
-	gprof ./$(Profiling) > GraphProfiling.txt
-	-rm -rf gmon.out
-
-$(Profiling): $(Profiling).cpp $(foreach g,$(GRAPHS),$g.o) $(LIB).o
-	$(CXX) $(CXXFLAGS) $(PROFILINGFLAGS) -o $@ $^
-
-.PHONY: clean all profile
+.PHONY: clean all
 .SUFFIXES:
 
 clean: 

@@ -5,10 +5,10 @@
 #include <iostream>
 #include <assert.h>
 
-#include "kosaraju.hpp"
-#include "Graph.hpp"
-#include "AdjacencyGraph.hpp"
-#include "ListGraph.hpp"
+#include "../graph_library/kosaraju.hpp"
+#include "../graph_library/Graph.hpp"
+#include "../graph_library/ListGraph.hpp"
+#include "../graph_library/AdjacencyGraph.hpp"
 
 #define TIMES_TO_RUN 10
 #define MAX_VERTICES 200
