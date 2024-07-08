@@ -1,33 +1,28 @@
 CXX = g++
-CXXFLAGS = -Wall -Wextra -Werror -g -std=c++17
+CXXFLAGS = -Wall -Wextra -Werror -ggdb
 
+BUILD_DIR = ../build
+GRAPH_DIR = ../graph_library
+
+GRAPH_LIB = libgraph
 MAIN = main
-LIB = kosaraju
-
-GRAPH = Graph
-GRAPH_IMPL = AdjacencyGraph
-
-HEADERS = $(GRAPH).hpp $(GRAPH_IMPL).hpp $(LIB).hpp
-
-EXE = Kosaraju
+EXE = kosaraju
 
 all: $(EXE)
 
-$(EXE): $(MAIN).o $(LIB).o $(GRAPH_IMPL).o
+$(BUILD_DIR):
+	-mkdir -p $@
+
+$(EXE): $(MAIN).o $(BUILD_DIR)/$(GRAPH_LIB).a | $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) -o $@ $^
 
-$(MAIN).o: $(MAIN).cpp $(HEADERS)
+$(MAIN).o: $(MAIN).cpp | $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) -c -o $@ $<
 
-$(LIB).o: $(LIB).cpp $(LIB).hpp
-	$(CXX) $(CXXFLAGS) -c -o $@ $<
-	
+$(BUILD_DIR)/$(GRAPH_LIB).a:
+	make -C $(GRAPH_DIR)
 
-%Graph.o: %Graph.cpp %Graph.hpp $(GRAPH).hpp
-	$(CXX) $(CXXFLAGS) -c $< -o $@
+clean:
+	rm -f $(EXE) $(MAIN).o
 
-.PHONY: clean all profile
-.SUFFIXES:
-
-clean: 
-	rm -rf *.o $(EXE)
+.PHONY: clean all

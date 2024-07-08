@@ -16,10 +16,10 @@ gprof: $(PROFILING)
 	gprof ./$(PROFILING) > GraphProfiling.txt
 	-rm -rf gmon.out
 
-$(PROFILING): $(BUILD_DIR)/$(PROFILING).o $(BUILD_DIR)/$(GRAPH_LIB).a | $(BUILD_DIR)
+$(PROFILING): $(PROFILING).o $(BUILD_DIR)/$(GRAPH_LIB).a | $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) $(PROFILINGFLAGS) -o $@ $^
 
-$(BUILD_DIR)/$(PROFILING).o: $(PROFILING).cpp | $(BUILD_DIR)
+$(PROFILING).o: $(PROFILING).cpp | $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) -c -o $@ $<
 
 $(BUILD_DIR)/$(GRAPH_LIB).a:

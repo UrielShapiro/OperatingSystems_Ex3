@@ -7,17 +7,18 @@ LIB_DIR = ../pattern_library
 
 PATTERN_LIB = libpattern_library
 GRAPH_LIB = libgraph
-kosaraju = main
+MAIN = main
+EXE = kosaraju
 
-all: kosaraju
+all: $(EXE)
 
 $(BUILD_DIR):
 	-mkdir -p $@
 
-kosaraju: $(BUILD_DIR)/$(kosaraju).o $(BUILD_DIR)/$(GRAPH_LIB).a $(BUILD_DIR)/$(PATTERN_LIB).a | $(BUILD_DIR)
+$(EXE): $(MAIN).o $(BUILD_DIR)/$(GRAPH_LIB).a $(BUILD_DIR)/$(PATTERN_LIB).a | $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) -o $@ $^
 
-$(BUILD_DIR)/$(kosaraju).o: $(kosaraju).cpp | $(BUILD_DIR)
+$(MAIN).o: $(MAIN).cpp | $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) -c -o $@ $<
 
 $(BUILD_DIR)/$(GRAPH_LIB).a:
@@ -27,7 +28,6 @@ $(BUILD_DIR)/$(PATTERN_LIB).a:
 	make -C $(LIB_DIR)
 
 clean:
-	rm -f kosaraju
-	rm -f $(BUILD_DIR)/$(kosaraju).o
+	rm -f $(MAIN).o $(EXE)
 
 .PHONY: clean all

@@ -23,10 +23,9 @@ $(BUILD_DIR)/$(REACTOR).o: $(REACTOR).cpp $(REACTOR).hpp | $(BUILD_DIR)
 $(BUILD_DIR)/$(PROACTOR).o: $(PROACTOR).cpp $(PROACTOR).hpp | $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) -c -o $@ $<
 
-$(BUILD_DIR)/$(LIB).a: $(BUILD_DIR)/$(REACTOR).o | $(BUILD_DIR)
+$(BUILD_DIR)/$(LIB).a: $(BUILD_DIR)/$(REACTOR).o # $(PROACTOR).o | $(BUILD_DIR)
 	$(AR) rcs $@ $^
 
-# $(PROACTOR).o
 
 clean:
 	rm -f $(TEST) $(BUILD_DIR)/$(REACTOR).o $(BUILD_DIR)/$(PROACTOR).o $(BUILD_DIR)/$(LIB).a

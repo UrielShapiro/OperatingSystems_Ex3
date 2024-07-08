@@ -7,7 +7,7 @@ BUILD_DIR = ../build
 # GRAPH_IMPL = ListGraph
 GRAPH_IMPL = AdjacencyGraph
 MAIN = main
-EXE = Kosaraju
+EXE = kosaraju
 
 all: $(EXE)
 
@@ -27,5 +27,5 @@ $(BUILD_DIR)/$(GRAPH_LIB).a:
 .SUFFIXES:
 
 clean: 
-	rm -rf *.o $(EXE) $(Profiling) gmon.out
+	rm -rf *.o $(EXE)
 	

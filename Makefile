@@ -1,7 +1,7 @@
 CXX = g++
 CXXFLAGS = -Wall -Wextra -Werror -ggdb
 
-QS = Q2 Q3 Q6 Q7
+QS = graph_library pattern_library Q2 Q3 Q4 Q6 Q7
 QS_all = $(foreach q, $(QS), $(q)_all)
 QS_clean = $(foreach q, $(QS), $(q)_clean)
 
@@ -18,5 +18,6 @@ $(QS_clean):
 	$(MAKE) -C $(@:_clean=) clean
 
 clean: $(QS_clean)
+	rm -rf $(BUILD_DIR)
 
 .PHONY: clean all $(QS_all) $(QS_clean)
