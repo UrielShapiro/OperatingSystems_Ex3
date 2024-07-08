@@ -1,7 +1,8 @@
 /.vscode
 Q3/Kosaraju
 *.o
-.a
+*.a
+build/
 Q3/ProfilingTest
 Q4/Kosaraju
 Q5/test

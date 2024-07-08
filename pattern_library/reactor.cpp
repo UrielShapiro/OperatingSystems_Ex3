@@ -2,8 +2,12 @@
 #include <vector>
 #include <poll.h>
 #include <algorithm>
+#include <unistd.h>
+#include <iostream>
 
 #include "reactor.hpp"
+
+#define DEBUG
 
 Reactor::Reactor() : running(false), thread(nullptr), fds_count(0) {}
 
@@ -32,14 +36,26 @@ bool Reactor::add_fd(int fd, Handler handler)
 
 bool Reactor::remove_fd(int fd)
 {
-    this->vectors_mutex.lock();
+#ifdef DEBUG
+    std::cout << "Removing fd\n";
+    std::cout << "fds_count: " << fds_count << std::endl;
+    std::cout << "pfds.size: " << pfds.size() << std::endl;
+#endif
+    // this->vectors_mutex.lock();  // Problematic line
     for (size_t i = 0; i < fds_count; ++i)
     {
+#ifdef DEBUG
+        std::cout << "Checking fd: " << pfds[i].fd << " VS " << fd << std::endl;
+#endif
         if (pfds[i].fd == fd)
         {
+#ifdef DEBUG
+            std::cout << "Found!\n";
+#endif
             pfds.erase(pfds.begin() + i);
             handlers.erase(handlers.begin() + i);
             fds_count -= 1;
+            close(fd); // Uriel's addition - Not working
             this->vectors_mutex.unlock();
             return true;
         }
@@ -79,6 +95,10 @@ void Reactor::reactor_main()
             if (pfds[i].revents & POLLIN)
             {
                 handlers[i](pfds[i].fd);
+            }
+            else if (pfds[i].revents & POLLNVAL)
+            {
+                this->remove_fd(pfds[i].fd);
             }
         }
         this->vectors_mutex.unlock();
