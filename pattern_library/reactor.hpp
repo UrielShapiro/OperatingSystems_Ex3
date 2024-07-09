@@ -39,7 +39,7 @@ public:
      */
     ~Reactor();
     /**
-     * Starts the reactor in a separate thread.
+     * Starts the reactor in a separate thread. If the reactor was already running it is stopped first.
      */
     void start();
     /**

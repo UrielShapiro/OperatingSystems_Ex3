@@ -63,6 +63,7 @@ bool Reactor::remove_fd(int fd)
 
 void Reactor::start()
 {
+    stop();
     {
         std::lock_guard<std::mutex> running_guard(running_mutex);
         running = true;
@@ -81,6 +82,12 @@ void Reactor::stop()
     thread->join();
     delete thread;
     thread = nullptr;
+    {
+        std::lock_guard<std::mutex> vectors_guard(vectors_mutex);
+        handlers.clear();
+        pfds.clear();
+        fds_count = 0;
+    }
 }
 
 struct handler_action
