@@ -16,7 +16,6 @@ void echo_to_fd_continuously(int fd)
     std::cout << "Client disconnected" << std::endl;
 }
 
-
 // most of this test code was generated using GitHib Copilot
 int main()
 {
