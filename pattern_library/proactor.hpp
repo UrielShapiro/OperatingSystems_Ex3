@@ -8,6 +8,7 @@
 
 class Proactor
 {
+public:
     using Handler = std::function<void(int)>;
 
 private:

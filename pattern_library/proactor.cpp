@@ -1,6 +1,7 @@
 #include "proactor.hpp"
 
 #include <thread>
+#include <string.h>
 #include <vector>
 #include <poll.h>
 #include <sys/types.h>
@@ -10,6 +11,11 @@
 #include <stdexcept>
 
 Proactor::Proactor() : running(false), main_thread(nullptr) {}
+
+Proactor::~Proactor()
+{
+    this->stop();
+}
 
 void Proactor::start(int sockfd, Handler client_handler)
 {
@@ -34,6 +40,7 @@ void Proactor::stop()
     }
     main_thread->join();
     delete main_thread;
+    main_thread = nullptr;
 }
 
 void Proactor::proactor_main()
@@ -50,8 +57,20 @@ void Proactor::proactor_main()
     }
     while (still_running)
     {
-        int client_fd = accept(sockfd, nullptr, nullptr);
-        worker_threads.push_back(std::thread(client_handler));
+        fd_set set;
+        FD_ZERO(&set);
+        FD_SET(sockfd, &set);
+        struct timeval timeout{0, 10000};
+        int select_result = select(sockfd + 1, &set, NULL, NULL, &timeout);
+        if (select_result > 0)
+        {
+            int client_fd = accept(sockfd, NULL, NULL);
+            std::thread(client_handler, client_fd).detach();
+        }
+        else if (select_result < 0)
+        {
+            throw std::runtime_error(strerror(errno));
+        }
         {
             std::lock_guard<std::mutex> running_guard(running_mutex);
             still_running = running;

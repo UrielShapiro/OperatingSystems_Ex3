@@ -80,6 +80,7 @@ void Reactor::stop()
     }
     thread->join();
     delete thread;
+    thread = nullptr;
 }
 
 struct handler_action
