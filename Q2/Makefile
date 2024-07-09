@@ -27,3 +27,6 @@ $(BUILD_DIR)/$(GRAPH_LIB).a:
 
 clean:
 	rm -rf *.o profile $(PROFILING) gmon.out GraphProfiling.txt
+
+.PHONY: all gprof clean
+.SUFFIXES:

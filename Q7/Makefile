@@ -28,3 +28,4 @@ clean:
 	rm -f $(EXE) $(MAIN).o
 
 .PHONY: clean all
+.SUFFIXES:

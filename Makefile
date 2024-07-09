@@ -21,3 +21,4 @@ clean: $(QS_clean)
 	rm -rf $(BUILD_DIR)
 
 .PHONY: clean all $(QS_all) $(QS_clean)
+.SUFFIXES:
