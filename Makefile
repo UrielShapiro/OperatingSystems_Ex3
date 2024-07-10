@@ -1,7 +1,7 @@
 CXX = g++
 CXXFLAGS = -Wall -Wextra -Werror -ggdb
 
-QS = graph_library pattern_library Q2 Q3 Q4 Q6 Q7 Q9
+QS = graph_library pattern_library Q2 Q3 Q4 Q6 Q7 Q9 Q10
 QS_all = $(foreach q, $(QS), $(q)_all)
 QS_clean = $(foreach q, $(QS), $(q)_clean)
 
