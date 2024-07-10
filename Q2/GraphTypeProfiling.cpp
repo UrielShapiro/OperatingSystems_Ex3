@@ -3,10 +3,8 @@
 #include <random>
 #include <chrono>
 #include <iostream>
-#include <assert.h>
 
 #include "../graph_library/kosaraju.hpp"
-#include "kosaraju_deque.hpp"
 #include "../graph_library/Graph.hpp"
 #include "../graph_library/ListGraph.hpp"
 #include "../graph_library/AdjacencyGraph.hpp"
@@ -37,14 +35,6 @@ vector<vector<bool>> generate_adjacency_matrix(int num_vertices, double density)
     return adj_matrix;
 }
 
-void profile_kosaraju(const Graph &g)
-{
-    auto start = std::chrono::high_resolution_clock::now();
-    
-    auto end = std::chrono::high_resolution_clock::now();
-
-    std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
-}
 int main()
 {
     static std::random_device rd; // random number generator
