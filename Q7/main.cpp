@@ -271,6 +271,7 @@ void client_main(int fd)
         {
             cout << e.what() << std::endl;
             error_handler(fd);
+            continue;
         }
         input.pop_back(); // Remove the newline character
         if (handle_user_input(fd, input))
