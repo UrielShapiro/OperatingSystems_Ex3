@@ -49,7 +49,7 @@ public:
     void stop();
 
     /**
-     * @returns if the proactor is still running.
+     * @returns The main thread of the proactor.
      */
-    bool get_running();
+    std::thread& get_thread();
 };

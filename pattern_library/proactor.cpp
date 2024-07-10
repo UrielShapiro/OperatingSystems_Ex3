@@ -75,7 +75,7 @@ void Proactor::proactor_main()
     }
 }
 
-bool Proactor::get_running()
+std::thread& Proactor::get_thread()
 {
-    return this->running;
+    return *(this->main_thread);
 }
