@@ -293,7 +293,7 @@ int main()
         perror("socket failed");
         exit(EXIT_FAILURE);
     }
-    
+
     // Forcefully attaching socket to the port 9034
     if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt)))
     {
@@ -325,8 +325,7 @@ int main()
     std::cout << "Server is listening on port " << PORT << std::endl;
 
     proactor.start(server_fd, server_main);
-    while (proactor.get_running())
-        ;
+    proactor.get_thread().join();
     proactor.stop();
 
     close(server_fd);
