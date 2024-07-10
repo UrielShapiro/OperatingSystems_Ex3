@@ -31,6 +31,7 @@
 #define DEBUG
 
 using std::cin, std::cout, std::endl, std::set, std::string;
+using std::operator""s;
 
 Graph *g = nullptr;
 std::shared_mutex graph_mutex;
@@ -118,7 +119,7 @@ void above_half_listener()
         above_half_cond.wait(above_half_lock, [prev_above_half]
                              { return above_half != prev_above_half; }); // Wait for the cond to be notified
         prev_above_half = above_half;
-        print_above_half();                                              // Will be called when the cond awakes (stops waiting because a thread was notified).
+        print_above_half(); // Will be called when the cond awakes (stops waiting because a thread was notified).
     }
 }
 
@@ -179,6 +180,7 @@ bool handle_user_input(int fd, string input)
             }
         }
         size_t n = strtoull(param1.c_str(), nullptr, 10), m = strtoull(param2.c_str(), nullptr, 10);
+        cout << "User is creating a new graph with " << n << (n == 1 ? " vertex and " : " vertices and ") << m << (m == 1 ? " edge " : " edges ") << endl;
         {
             std::unique_lock<std::shared_mutex> graph_lock(graph_mutex);
 
@@ -186,15 +188,28 @@ bool handle_user_input(int fd, string input)
                 delete g;
 
             std::vector<std::pair<vertex, vertex>> edges;
-            for (size_t comp = 0; comp < m; ++comp)
+            for (size_t i = 1; i <= m; ++i)
             {
                 vertex src, dst;
-                string received_edge = receive_message(fd);
-                cout << "Received edge: " << received_edge << std::endl;
+                if (send_message(fd, "Enter edge "s + std::to_string(i) + ": "s))
+                {
+                    throw std::runtime_error("Error sending a message to the client");
+                }
+                string received_edge;
+                try
+                {
+                    received_edge = receive_message(fd);
+                }
+                catch(const std::runtime_error& e)
+                {
+                    std::cerr << "User disconnected before specifying all edges" << endl;
+                    break;
+                }
+                
                 char *space;
                 src = strtoull(received_edge.c_str(), &space, 10);
                 dst = strtoull(space + 1, nullptr, 10);
-                cout << "Parsed edge: " << src << " " << dst << std::endl;
+                cout << "User added edge: " << src << " " << dst << std::endl;
                 edges.push_back(std::make_pair(src, dst));
             }
             g = new GRAPH_IMPL(n, edges);
@@ -241,6 +256,7 @@ bool handle_user_input(int fd, string input)
                 {
                     throw std::runtime_error("Error sending a message to the client");
                 }
+                cout << "User added edge: " << src << " " << dst << endl;
             }
         }
         return false;
@@ -284,6 +300,7 @@ bool handle_user_input(int fd, string input)
                 {
                     throw std::runtime_error("Error sending a message to the client");
                 }
+                cout << "User removed edge: " << src << " " << dst << endl;
             }
         }
         return false;
@@ -293,9 +310,23 @@ bool handle_user_input(int fd, string input)
         std::cout << "Connection closed by the client" << std::endl;
         return true;
     }
+    else if (command == "Help")
+    {
+        std::string help;
+        help += "Available commands:\n"
+                "\tKosaraju - Computes SCCs in the graph using the Kosaraju-Sharir algorithm\n"
+                "\tNewgraph n,m - Resets the graph to a new graph with n vertices and m edges\n"
+                "\tNewedge s,d - Creates a new edge from vertex s to vertex d\n"
+                "\tRemoveedge s,d - Removed the edge from vertex s to vertex d\n";
+        if (send_message(fd, help))
+        {
+            throw std::runtime_error("Error sending a message to the client");
+        }
+        return false;
+    }
     else
     {
-        if (send_message(fd, "Unknown command\n"))
+        if (send_message(fd, "Unknown command, use Help for available commands\n"))
         {
             throw std::runtime_error("Error sending a message to the client");
         }
@@ -391,7 +422,6 @@ int main()
 
     proactor.start(server_fd, server_main);
     std::thread t(above_half_listener); // Start the above_half_listener thread
-    t.detach();                         // Detach the thread so it can run in the background
     proactor.get_thread().join();
     proactor.stop();
 
