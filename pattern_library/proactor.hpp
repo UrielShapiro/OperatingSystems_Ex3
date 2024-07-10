@@ -47,4 +47,9 @@ public:
      * Could take up to ACCEPT_TO_MS ms for the proactor to stop.
      */
     void stop();
+
+    /**
+     * @returns if the proactor is still running.
+     */
+    bool get_running();
 };

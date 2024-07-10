@@ -23,8 +23,8 @@ void Proactor::start(int sockfd, Handler client_handler)
     this->sockfd = sockfd;
     this->client_handler = client_handler;
     {
-        std::lock_guard<std::mutex> running_guard(running_mutex);
-        running = true;
+        std::lock_guard<std::mutex> running_guard(this->running_mutex);
+        this->running = true;
     }
     main_thread = new std::thread(&Proactor::proactor_main, this);
 }
@@ -44,11 +44,6 @@ void Proactor::stop()
 
 void Proactor::proactor_main()
 {
-    if (fcntl(sockfd, F_SETFL, O_NONBLOCK) < 0)
-    {
-        throw std::runtime_error("Error setting socket in non-blocking mode");
-    }
-
     bool still_running;
     {
         std::lock_guard<std::mutex> running_guard(running_mutex);
@@ -78,4 +73,9 @@ void Proactor::proactor_main()
             still_running = running;
         }
     }
+}
+
+bool Proactor::get_running()
+{
+    return this->running;
 }
