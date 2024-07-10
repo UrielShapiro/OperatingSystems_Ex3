@@ -40,7 +40,7 @@ $(BUILD_DIR)/$(GRAPH_LIB).a:
 	make -C $(GRAPH_DIR)
 
 clean:
-	rm -rf *.o profile $(PROFILING) gmon.out GraphProfiling.txt KosarajuProfiling.txt
+	rm -rf *.o profile $(PROFILING) $(KOSARAJU_PROFILING) gmon.out GraphProfiling.txt KosarajuProfiling.txt
 
 .PHONY: all gprof clean
 .SUFFIXES:
