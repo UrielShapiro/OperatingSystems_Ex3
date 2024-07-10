@@ -69,17 +69,21 @@ string receive_message(int fd)
     return buffer;
 }
 
+/**
+ * @brief Check if more then half of the graph nodes is in the same SCC
+ *      and notify the above_half_listener thread if the condition changes
+ */
 void past_half(set<set<vertex>> &comps)
 {
     for (auto comp : comps)
     {
-        if (comp.size() >= g->get_vertex_count() / 2)
+        if (comp.size() >= g->get_vertex_count() / 2)   // If the size of the component is greater than half of the graph
         {
-            if (!above_half)
+            if (!above_half)    // If we were not above half and now we are
             {
-                std::lock_guard half(above_half_mutex);
+                std::lock_guard half(above_half_mutex); // Lock the mutex so that we can change the above_half variable
                 above_half = true;
-                above_half_cond.notify_one();
+                above_half_cond.notify_one();   // Notify the above_half_listener thread
                 return;
             }
             else
@@ -88,7 +92,7 @@ void past_half(set<set<vertex>> &comps)
             }
         }
     }
-    if (above_half)
+    if (above_half) // If we were above half and now we are not
     {
         std::lock_guard above_half_guard(above_half_mutex);
         above_half = false;
@@ -102,13 +106,17 @@ void print_above_half()
     cout << "At Least 50% of the graph" << (above_half ? " " : " no longer ") << "belongs to the same SCC" << endl;
 }
 
+/**
+ * @brief There is a thread running this function that will be notified when the above_half_cond notifies it.
+ *        When the condition changes, the function print_above_half will be called.
+ */
 void above_half_listener()
 {
     while (true)
     {
         std::unique_lock<std::mutex> above_half_lock(above_half_mutex);
-        above_half_cond.wait(above_half_lock);
-        print_above_half();
+        above_half_cond.wait(above_half_lock);  // Wait for the cond to be notified
+        print_above_half(); // Will be called when the cond awakes (stops waiting because a thread was notified).
     }
 }
 
@@ -293,6 +301,11 @@ bool handle_user_input(int fd, string input)
     }
 }
 
+
+/**
+ * @brief The main function for the server
+ * @param fd The file descriptor of the client
+ */
 void server_main(int fd)
 {
     bool run = true;
@@ -375,8 +388,8 @@ int main()
     std::cout << "Server is listening on port " << PORT << std::endl;
 
     proactor.start(server_fd, server_main);
-    std::thread t(above_half_listener);
-    t.detach();
+    std::thread t(above_half_listener); // Start the above_half_listener thread
+    t.detach();                         // Detach the thread so it can run in the background
     proactor.get_thread().join();
     proactor.stop();
 
