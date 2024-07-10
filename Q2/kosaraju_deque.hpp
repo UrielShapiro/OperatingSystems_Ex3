@@ -1,5 +1,5 @@
-#ifndef KOSARAJU_HPP
-#define KOSARAJU_HPP
+#ifndef KOSARAJU_DEQUE_HPP
+#define KOSARAJU_DEQUE_HPP
 #include <set>
 #include "../graph_library/Graph.hpp"
 
