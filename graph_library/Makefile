@@ -4,7 +4,7 @@ LDFLAGS = -pthread
 AR = ar
 ARFLAGS = rcs
 
-BUILD_DIR = ../build/
+BUILD_DIR = ../build
 LIB = libgraph
 Adjacency = AdjacencyGraph
 LIST = ListGraph
