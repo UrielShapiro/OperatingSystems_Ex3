@@ -23,17 +23,23 @@ size_t ListGraph::get_vertex_count() const
 
 bool ListGraph::edge_exists(const vertex src, const vertex dst) const
 {
+    if (src > this->get_vertex_count() || dst > this->get_vertex_count() || src <= 0 || dst <= 0)
+        throw std::out_of_range("Error: Invalid argument passed, One of the vertices does not exist");
     return std::find(this->adjacency_list.at(src).begin(),
                      this->adjacency_list.at(src).end(), dst) != this->adjacency_list.at(src).end();
 }
 
 list<vertex> ListGraph::get_neighbors(const vertex v) const
 {
-    return this->adjacency_list.at(v - 1);
+    if (v > this->get_vertex_count() || v <= 0)
+        throw std::out_of_range("Error: Invalid argument passed, Vertex does not exist");
+    return this->adjacency_list.at(v);
 }
 
 bool ListGraph::add_edge(const vertex src, const vertex dst)
 {
+    if (src > this->get_vertex_count() || dst > this->get_vertex_count() || src <= 0 || dst <= 0)
+        throw std::out_of_range("Error: Can't add this edge, One of the vertices does not exist");
     bool output = std::find(this->adjacency_list.at(src).begin(),
                             this->adjacency_list.at(src).end(), dst) == this->adjacency_list.at(src).end();
     if (output)
@@ -44,6 +50,8 @@ bool ListGraph::add_edge(const vertex src, const vertex dst)
 
 bool ListGraph::remove_edge(const vertex src, const vertex dst)
 {
+    if (src > this->get_vertex_count() || dst > this->get_vertex_count() || src <= 0 || dst <= 0)
+        throw std::out_of_range("Error: Can't remove this edge, One of the vertices does not exist");
     bool output = std::find(this->adjacency_list.at(src).begin(),
                             this->adjacency_list.at(src).end(), dst) != this->adjacency_list.at(src).end();
     if (output)
@@ -54,6 +62,8 @@ bool ListGraph::remove_edge(const vertex src, const vertex dst)
 
  list<vertex> ListGraph::get_incoming_neighbors(const vertex dst) const
  {
+    if (dst > this->get_vertex_count() || dst <= 0)
+        throw std::out_of_range("Error: Vertex does not exist");
     list<vertex> output;
     for (size_t i = 1; i < adjacency_list.size(); ++i)
     {

@@ -109,7 +109,7 @@ bool handle_user_input(int fd, Graph **g, std::string input)
         if (*g)
             delete *g;
         std::vector<std::pair<vertex, vertex>> edges;
-        for (size_t i = 0; i < m; ++i) // FIXME
+        for (size_t i = 0; i < m; ++i)
         {
             vertex src, dst;
             string received_edge = receive_message(fd);
@@ -292,6 +292,7 @@ int main()
         exit(EXIT_FAILURE);
     }
 
+    // The server stops when no clients are connected
     while (!pfds.empty())
     {
         new_socket = -1;
@@ -335,6 +336,7 @@ int main()
                         if (handle_user_input(it.fd, &g, input))
                         {
                             close(it.fd);
+                            // Remove the client from the list of clients
                             pfds.erase(std::remove_if(pfds.begin(), pfds.end(), [it](struct pollfd pfd)
                                                       { return pfd.fd == it.fd; }));
                         }

@@ -6,8 +6,18 @@
 #include <mutex>
 #include <vector>
 
+// Accept timeout in milliseconds
 constexpr int ACCEPT_TO_MS = 10;
 
+/**
+ * This class implements the proactor design pattern.
+ * The proactor listens to a passive socket and when a new client connects it calls a handler with the client's socket.
+ * The proactor uses a main thread to accept new connections and worker threads to handle the clients.
+ * The proactor is started with start() and stopped with stop().
+ * The handler is called with the client's socket as an argument.
+ * The proactor is not thread safe, do not call start() or stop() from multiple threads.
+ * The handler is called from a worker thread, make sure it is thread safe.
+ */
 class Proactor
 {
 public:
@@ -18,14 +28,12 @@ public:
     using Handler = std::function<void(int)>;
 
 private:
-    Handler client_handler;
-    int sockfd;
-    bool running;
-    std::mutex running_mutex;
-    std::thread *main_thread;
-    std::vector<std::thread> worker_threads;
-    std::vector<struct pollfd> pfds;
-    void proactor_main();
+    Handler client_handler; // The handler for accepted connections
+    int sockfd;            // The socket file descriptor to listen to
+    bool running;           // Whether the proactor is running
+    std::mutex running_mutex;   // Mutex for the running variable
+    std::thread *main_thread;   // The main thread of the proactor
+    void proactor_main();                   // The main function of the proactor        
 
 public:
     /**

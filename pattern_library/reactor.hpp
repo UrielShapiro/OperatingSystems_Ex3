@@ -23,12 +23,12 @@ public:
 private:
     bool running;
     std::mutex running_mutex;
-    std::thread *thread;
-    size_t fds_count;
-    std::vector<Handler> handlers;
-    std::vector<struct pollfd> pfds;
-    std::mutex vectors_mutex;
-    void reactor_main();
+    std::thread *thread;    // The thread that runs the reactor
+    size_t fds_count;       // The number of file descriptors
+    std::vector<Handler> handlers;  // The handlers for the file descriptors
+    std::vector<struct pollfd> pfds;    // The file descriptors to poll
+    std::mutex vectors_mutex;           // Mutex for the vectors
+    void reactor_main();                // The main function of the reactor
 public:
     /**
      * Creates a new reactor, intially not running, you can add file descriptors to it and use start() to start it.

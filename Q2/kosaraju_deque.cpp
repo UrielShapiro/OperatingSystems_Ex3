@@ -4,6 +4,8 @@
 #include <map>
 #include <algorithm>
 
+// Exactly the same as kosaraju.cpp, except for the visit and assign functions use the deque data structure
+
 void deque_visit(const Graph &g, std::map<vertex, bool> &visited, std::deque<vertex> &l, vertex u)
 {
     if (visited[u])
