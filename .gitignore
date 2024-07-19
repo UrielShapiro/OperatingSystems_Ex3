@@ -1,6 +1,2 @@
 /.vscode
-Q3/Kosaraju
-*.o
-Q3/ProfilingTest
-Q4/Kosaraju
-Q5/test
+build/

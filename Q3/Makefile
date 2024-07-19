@@ -1,44 +1,31 @@
 CXX = g++
 CXXFLAGS = -Wall -Wextra -Werror -g -std=c++17
-PROFILINGFLAGS = -pg
+GRAPH_DIR = ../graph_library
+GRAPH_LIB = libgraph
+BUILD_DIR = ../build
 
-MAIN = main
-LIB = kosaraju
-
-GRAPH = Graph
-GRAPH_IMPL = AdjacencyGraph
-Profiling = ProfilingTest
-
-GRAPHS = AdjacencyGraph ListGraph
 # GRAPH_IMPL = ListGraph
-HEADERS = $(GRAPH).hpp $(GRAPH_IMPL).hpp $(LIB).hpp
-
-EXE = Kosaraju
+GRAPH_IMPL = AdjacencyGraph
+MAIN = main
+EXE = kosaraju
 
 all: $(EXE)
 
-$(EXE): $(MAIN).o $(LIB).o $(GRAPH_IMPL).o
+$(BUILD_DIR):
+	-mkdir -p $@
+
+$(EXE): $(MAIN).o $(BUILD_DIR)/$(GRAPH_LIB).a
 	$(CXX) $(CXXFLAGS) -o $@ $^
 
-$(MAIN).o: $(MAIN).cpp $(HEADERS)
+$(MAIN).o: $(MAIN).cpp $(BUILD_DIR)/$(GRAPH_LIB).a | $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) -c -o $@ $<
 
-$(LIB).o: $(LIB).cpp $(LIB).hpp
-	$(CXX) $(CXXFLAGS) -c -o $@ $<
+$(BUILD_DIR)/$(GRAPH_LIB).a:
+	make -C $(GRAPH_DIR)
 
-%Graph.o: %Graph.cpp %Graph.hpp $(GRAPH).hpp
-	$(CXX) $(CXXFLAGS) -c $< -o $@
-
-profile: $(Profiling)
-	./$(Profiling)
-	gprof ./$(Profiling) > GraphProfiling.txt
-	-rm -rf gmon.out
-
-$(Profiling): $(Profiling).cpp $(foreach g,$(GRAPHS),$g.o) $(LIB).o
-	$(CXX) $(CXXFLAGS) $(PROFILINGFLAGS) -o $@ $^
-
-.PHONY: clean all profile
+.PHONY: clean all
 .SUFFIXES:
 
 clean: 
-	rm -rf *.o $(EXE) $(Profiling) gmon.out
+	rm -rf *.o $(EXE)
+	

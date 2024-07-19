@@ -7,8 +7,8 @@
 #include <map>
 #include <string>
 #include <sstream>
-#include "Graph.hpp"
-#include "kosaraju.hpp"
+#include "../graph_library/kosaraju.hpp"
+#include "../graph_library/Graph.hpp"
 
 #define GRAPH_IMPL AdjacencyGraph
 // #define GRAPH_IMPL ListGraph
@@ -17,7 +17,7 @@
 #define STRINGIFY(x) #x
 #define TOSTRING(x) STRINGIFY(x)
 
-#include TOSTRING(GRAPH_IMPL.hpp)
+#include TOSTRING(../graph_library/GRAPH_IMPL.hpp)
 
 using std::cin, std::cout, std::set;
 

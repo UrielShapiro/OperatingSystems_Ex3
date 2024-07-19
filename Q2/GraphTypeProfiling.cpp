@@ -3,12 +3,11 @@
 #include <random>
 #include <chrono>
 #include <iostream>
-#include <assert.h>
 
-#include "kosaraju.hpp"
-#include "Graph.hpp"
-#include "AdjacencyGraph.hpp"
-#include "ListGraph.hpp"
+#include "../graph_library/kosaraju.hpp"
+#include "../graph_library/Graph.hpp"
+#include "../graph_library/ListGraph.hpp"
+#include "../graph_library/AdjacencyGraph.hpp"
 
 #define TIMES_TO_RUN 10
 #define MAX_VERTICES 200
@@ -23,13 +22,13 @@ vector<vector<bool>> generate_adjacency_matrix(int num_vertices, double density)
     static std::mt19937 gen(rd());            // seeder
     std::bernoulli_distribution dis(density); // Bernoulli distribution on the density
 
-    for (int iteration = 0; iteration < num_vertices; ++iteration)
+    for (int i = 0; i < num_vertices; ++i)
     {
-        for (int density = 0; density < num_vertices; ++density)
+        for (int j = 0; j < num_vertices; ++j)
         {
-            if (iteration != density && dis(gen))
+            if (i != j && dis(gen))
             {
-                adj_matrix[iteration][density] = true;
+                adj_matrix[i][j] = true;
             }
         }
     }
@@ -38,9 +37,8 @@ vector<vector<bool>> generate_adjacency_matrix(int num_vertices, double density)
 
 int main()
 {
-
-    static std::random_device rd;  // random number generator
-    static std::mt19937 gen(rd()); // seeder
+    static std::random_device rd; // random number generator
+    static std::mt19937 gen(rd());
 
     vector<size_t> amount_of_vertices = {5, 10, 20, 50, 100, 150, 170, 200};
     std::cout << "All times in microseconds averaged over " << TIMES_TO_RUN << " runs using the same graph for both implementations" << std::endl;
@@ -53,7 +51,7 @@ int main()
             int64_t adj_sum = 0;
             int64_t list_sum = 0;
 
-            for (size_t iteration = 0; iteration < TIMES_TO_RUN; iteration++)
+            for (size_t i = 0; i < TIMES_TO_RUN; i++)
             {
                 vector<vector<bool>> adj_matrix = generate_adjacency_matrix(num_vertices, density);
 

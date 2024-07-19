@@ -1,0 +1,430 @@
+#include <iostream>
+#include <vector>
+#include <algorithm>
+#include <utility>
+#include <functional>
+#include <set>
+#include <string>
+#include <sstream>
+#include <unistd.h>
+#include <arpa/inet.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <fcntl.h>
+#include <map>
+#include <thread>
+#include <mutex>
+#include <shared_mutex>
+#include <condition_variable>
+#include "../graph_library/Graph.hpp"
+#include "../graph_library/kosaraju.hpp"
+#include "../pattern_library/proactor.hpp"
+
+#define GRAPH_IMPL AdjacencyGraph
+#include "../graph_library/AdjacencyGraph.hpp"
+
+#define PORT 9034
+#define MAX_USERS 5
+#define MAX_SEGMENT_SIZE 65535
+
+#define DEBUG
+
+using std::cin, std::cout, std::endl, std::set, std::string;
+using std::operator""s;
+
+Graph *g = nullptr;
+std::shared_mutex graph_mutex;
+
+std::condition_variable above_half_cond;
+std::mutex above_half_mutex;
+bool above_half = false;
+
+/**
+ * @brief Send a message to the client
+ * @return true if an error occurred, false otherwise
+ */
+bool send_message(int fd, string message)
+{
+    return write(fd, message.c_str(), message.length() + 1) < 0;
+}
+
+/**
+ * @brief Receive a message from the client
+ * @return The received message
+ * @throw Throws runtime_error if an error occurred
+ */
+string receive_message(int fd)
+{
+    char buffer[MAX_SEGMENT_SIZE];
+    ssize_t bytes_read = read(fd, buffer, MAX_SEGMENT_SIZE);
+    if (bytes_read < 0)
+    {
+        throw std::runtime_error("Something went wrong when trying to read from the socket");
+    }
+    if (bytes_read == 0)
+    {
+        throw std::runtime_error("Connection closed by the client");
+    }
+    buffer[bytes_read] = '\0'; // Null-terminate the buffer if it's a string
+    return buffer;
+}
+
+/**
+ * @brief Check if more then half of the graph nodes is in the same SCC
+ *      and notify the above_half_listener thread if the condition changes
+ */
+void past_half(set<set<vertex>> &comps)
+{
+    for (auto comp : comps)
+    {
+        if (comp.size() >= g->get_vertex_count() / 2.0f) // If the size of the component is greater than half of the graph
+        {
+            if (!above_half) // If we were not above half and now we are
+            {
+                std::lock_guard half(above_half_mutex); // Lock the mutex so that we can change the above_half variable
+                above_half = true;
+                above_half_cond.notify_one(); // Notify the above_half_listener thread
+            }
+            return;
+        }
+    }
+    if (above_half) // If we were above half and now we are not
+    {
+        std::lock_guard above_half_guard(above_half_mutex);
+        above_half = false;
+        above_half_cond.notify_one();
+    }
+}
+
+void print_above_half()
+{
+    cout << "At least 50% of the graph" << (above_half ? " " : " no longer ") << "belongs to the same SCC" << endl;
+}
+
+/**
+ * @brief There is a thread running this function that will be notified when the above_half_cond notifies it.
+ *        When the condition changes, the function print_above_half will be called.
+ */
+void above_half_listener()
+{
+    bool prev_above_half;
+    {
+        std::lock_guard<std::mutex> above_half_guard(above_half_mutex);
+        prev_above_half = above_half;
+    }
+    while (true)
+    {
+        std::unique_lock<std::mutex> above_half_lock(above_half_mutex);
+        above_half_cond.wait(above_half_lock, [prev_above_half]
+                             { return above_half != prev_above_half; }); // Wait for the cond to be notified
+        prev_above_half = above_half;
+        print_above_half(); // Will be called when the cond awakes (stops waiting because a thread was notified).
+    }
+}
+
+/**
+ * @brief Handle the user input
+ * @return true if the client requested to close the connection, false otherwise
+ */
+bool handle_user_input(int fd, string input)
+{
+    std::istringstream is(input);
+    std::string command;
+    std::getline(is, command, ' ');
+    if (command == "Kosaraju")
+    {
+        {
+            std::shared_lock<std::shared_mutex> graph_lock(graph_mutex);
+            if (!g)
+            {
+                if (send_message(fd, "Please create a graph using Newgraph <n>,<m> first\n"))
+                {
+                    throw std::runtime_error("Error sending a message to the client");
+                }
+                return false;
+            }
+        }
+        std::set<std::set<vertex>> comps;
+        {
+            std::shared_lock<std::shared_mutex> graph_lock(graph_mutex);
+            comps = kosaraju(*g);
+            past_half(comps);
+        }
+        string message;
+        message += "The strongly connected components are: \n";
+        for (auto comp : comps)
+        {
+            for (vertex v : comp)
+            {
+                message += std::to_string(v) + ' ';
+            }
+            message += '\n';
+        }
+        if (send_message(fd, message))
+        {
+            throw std::runtime_error("Error sending a message to the client");
+        }
+        return false;
+    }
+    else if (command == "Newgraph")
+    {
+        std::string param1, param2;
+        std::getline(is, param1, ',');
+        std::getline(is, param2);
+        if (param1.length() == 0 || param2.length() == 0)
+        {
+            if (send_message(fd, "Not enough parameters detected, command ignored\n"))
+            {
+                throw std::runtime_error("Error sending a message to the client");
+            }
+        }
+        size_t n = strtoull(param1.c_str(), nullptr, 10), m = strtoull(param2.c_str(), nullptr, 10);
+        cout << "User is creating a new graph with " << n << (n == 1 ? " vertex and " : " vertices and ") << m << (m == 1 ? " edge " : " edges ") << endl;
+        {
+            std::unique_lock<std::shared_mutex> graph_lock(graph_mutex);
+
+            if (g)
+                delete g;
+
+            std::vector<std::pair<vertex, vertex>> edges;
+            for (size_t i = 1; i <= m; ++i)
+            {
+                vertex src, dst;
+                if (send_message(fd, "Enter edge "s + std::to_string(i) + ": "s))
+                {
+                    throw std::runtime_error("Error sending a message to the client");
+                }
+                string received_edge;
+                try
+                {
+                    received_edge = receive_message(fd);
+                }
+                catch(const std::runtime_error& e)
+                {
+                    std::cerr << "User disconnected before specifying all edges" << endl;
+                    break;
+                }
+                
+                char *space;
+                src = strtoull(received_edge.c_str(), &space, 10);
+                dst = strtoull(space + 1, nullptr, 10);
+                cout << "User added edge: " << src << " " << dst << std::endl;
+                edges.push_back(std::make_pair(src, dst));
+            }
+            g = new GRAPH_IMPL(n, edges);
+            above_half = false;
+        }
+        return false;
+    }
+    else if (command == "Newedge")
+    {
+        {
+            std::shared_lock<std::shared_mutex> graph_lock(graph_mutex);
+            if (!g)
+            {
+                if (send_message(fd, "Please create a graph using Newgraph <n>,<m> first\n"))
+                {
+                    throw std::runtime_error("Error sending a message to the client");
+                }
+                return false;
+            }
+        }
+        std::string param1, param2;
+        std::getline(is, param1, ',');
+        std::getline(is, param2);
+        if (param1.length() == 0 || param2.length() == 0)
+        {
+            if (send_message(fd, "Not enough parameters detected, command ignored\n"))
+            {
+                throw std::runtime_error("Error sending a message to the client");
+            }
+        }
+        vertex src = strtoull(param1.c_str(), nullptr, 10), dst = strtoull(param2.c_str(), nullptr, 10);
+        {
+            std::unique_lock<std::shared_mutex> graph_lock(graph_mutex);
+            if (!g->add_edge(src, dst))
+            {
+                if (send_message(fd, "Edge already exists\n"))
+                {
+                    throw std::runtime_error("Error sending a message to the client");
+                }
+            }
+            else
+            {
+                if (send_message(fd, "Edge was created successfuly\n"))
+                {
+                    throw std::runtime_error("Error sending a message to the client");
+                }
+                cout << "User added edge: " << src << " " << dst << endl;
+            }
+        }
+        return false;
+    }
+    else if (command == "Removeedge")
+    {
+        {
+            std::shared_lock<std::shared_mutex> graph_lock(graph_mutex);
+            if (!g)
+            {
+                if (send_message(fd, "Please create a graph using Newgraph <n>,<m> first\n"))
+                {
+                    throw std::runtime_error("Error sending a message to the client");
+                }
+                return false;
+            }
+        }
+        std::string param1, param2;
+        std::getline(is, param1, ',');
+        std::getline(is, param2);
+        if (param1.length() == 0 || param2.length() == 0)
+        {
+            if (send_message(fd, "Not enough parameters detected, command ignored\n"))
+            {
+                throw std::runtime_error("Error sending a message to the client");
+            }
+        }
+        vertex src = strtoull(param1.c_str(), nullptr, 10), dst = strtoull(param2.c_str(), nullptr, 10);
+        {
+            std::unique_lock<std::shared_mutex> graph_lock(graph_mutex);
+            if (!g->remove_edge(src, dst))
+            {
+                if (send_message(fd, "Edge does not exist\n"))
+                {
+                    throw std::runtime_error("Error sending a message to the client");
+                }
+            }
+            else
+            {
+                if (send_message(fd, "Edge was removed successfuly\n"))
+                {
+                    throw std::runtime_error("Error sending a message to the client");
+                }
+                cout << "User removed edge: " << src << " " << dst << endl;
+            }
+        }
+        return false;
+    }
+    else if (command == "Exit")
+    {
+        std::cout << "Connection closed by the client" << std::endl;
+        return true;
+    }
+    else if (command == "Help")
+    {
+        std::string help;
+        help += "Available commands:\n"
+                "\tKosaraju - Computes SCCs in the graph using the Kosaraju-Sharir algorithm\n"
+                "\tNewgraph n,m - Resets the graph to a new graph with n vertices and m edges\n"
+                "\tNewedge s,d - Creates a new edge from vertex s to vertex d\n"
+                "\tRemoveedge s,d - Removed the edge from vertex s to vertex d\n";
+        if (send_message(fd, help))
+        {
+            throw std::runtime_error("Error sending a message to the client");
+        }
+        return false;
+    }
+    else
+    {
+        if (send_message(fd, "Unknown command, use Help for available commands\n"))
+        {
+            throw std::runtime_error("Error sending a message to the client");
+        }
+        return false;
+    }
+}
+
+/**
+ * @brief The main function for the server
+ * @param fd The file descriptor of the client
+ */
+void server_main(int fd)
+{
+    bool run = true;
+
+    std::function<void(int)> error_handler = [&](int fd)
+    {
+        close(fd);
+        run = false;
+    };
+
+    while (run)
+    {
+        string input;
+        if (send_message(fd, "Enter command: "))
+        {
+            std::cerr << ("Error sending a message to the client");
+            error_handler(fd);
+        }
+        try
+        {
+            input = receive_message(fd);
+        }
+        catch (const std::runtime_error &e)
+        {
+            cout << e.what() << std::endl;
+            error_handler(fd);
+            continue;
+        }
+        input.pop_back(); // Remove the newline character
+        if (handle_user_input(fd, input))
+        {
+            error_handler(fd);
+        }
+    }
+}
+
+int main()
+{
+    Proactor proactor;
+    int server_fd = -1;
+    struct sockaddr_in address;
+    int opt = 1;
+
+    std::cout << "Waiting for incoming connections..." << std::endl;
+
+    // Creating socket file descriptor
+    if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) <= 0)
+    {
+        perror("socket failed");
+        exit(EXIT_FAILURE);
+    }
+
+    // Forcefully attaching socket to the port 9034
+    if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt)))
+    {
+        perror("setsockopt");
+        close(server_fd);
+        exit(EXIT_FAILURE);
+    }
+
+    address.sin_family = AF_INET;
+    address.sin_addr.s_addr = INADDR_ANY;
+    address.sin_port = htons(PORT);
+
+    // Bind the socket to the network address and port
+    if (bind(server_fd, (struct sockaddr *)&address, sizeof(address)) < 0)
+    {
+        perror("bind failed");
+        close(server_fd);
+        exit(EXIT_FAILURE);
+    }
+
+    // Listen for incoming connections
+    if (listen(server_fd, MAX_USERS) < 0)
+    {
+        perror("listen");
+        close(server_fd);
+        exit(EXIT_FAILURE);
+    }
+
+    std::cout << "Server is listening on port " << PORT << std::endl;
+
+    proactor.start(server_fd, server_main);
+    std::thread t(above_half_listener); // Start the above_half_listener thread
+    proactor.get_thread().join();
+    proactor.stop();
+
+    close(server_fd);
+    return 0;
+}

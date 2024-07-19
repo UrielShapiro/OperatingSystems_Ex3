@@ -1,22 +1,31 @@
 #include "proactor.hpp"
 
 #include <thread>
+#include <string.h>
 #include <vector>
 #include <poll.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <stdexcept>
 
 Proactor::Proactor() : running(false), main_thread(nullptr) {}
 
+Proactor::~Proactor()
+{
+    this->stop();
+}
+
 void Proactor::start(int sockfd, Handler client_handler)
 {
+    stop();
     this->sockfd = sockfd;
-    running_mutex.lock();
-    running = true;
-    running_mutex.unlock();
     this->client_handler = client_handler;
+    {
+        std::lock_guard<std::mutex> running_guard(this->running_mutex);
+        this->running = true;
+    }
     main_thread = new std::thread(&Proactor::proactor_main, this);
 }
 
@@ -24,40 +33,49 @@ void Proactor::stop()
 {
     if (!main_thread)
         return;
-    running_mutex.lock();
-    running = false;
-    running_mutex.unlock();
+    {
+        std::lock_guard<std::mutex> running_guard(running_mutex);
+        running = false;
+    }
     main_thread->join();
     delete main_thread;
+    main_thread = nullptr;
 }
 
 void Proactor::proactor_main()
 {
-    if (fcntl(sockfd, F_SETFL, O_NONBLOCK) < 0)
+    bool still_running;
     {
-        throw std::runtime_error("Error setting socket in non-blocking mode");
+        std::lock_guard<std::mutex> running_guard(running_mutex);
+        still_running = running;
     }
-    while ((running_mutex.lock(), running))
+    while (still_running)
     {
-        int client_fd = accept(sockfd, nullptr, nullptr);
-        pfds_mutex.lock();
-        pfds.push_back(pollfd{
-            .fd = client_fd,
-            .events = POLLIN,
-            .revents = 0
-        });
-
-        running_mutex.unlock();
-        pfds_mutex.lock();
-        poll(pfds.data(), pfds.size(), 0);
-        for (size_t i = 0; i < pfds.size(); ++i)
+        fd_set set;
+        FD_ZERO(&set);
+        FD_SET(sockfd, &set);
+        struct timeval timeout
         {
-            if (pfds[i].revents & POLLIN)
-            {
-                worker_threads.push_back(std::thread(client_handler));
-            }
+            0, ACCEPT_TO_MS * 1000
+        };
+        int select_result = select(sockfd + 1, &set, NULL, NULL, &timeout);
+        if (select_result > 0)
+        {
+            int client_fd = accept(sockfd, NULL, NULL);
+            std::thread(client_handler, client_fd).detach();
         }
-        pfds_mutex.unlock();
+        else if (select_result < 0)
+        {
+            throw std::runtime_error(strerror(errno));
+        }
+        {
+            std::lock_guard<std::mutex> running_guard(running_mutex);
+            still_running = running;
+        }
     }
-    running_mutex.unlock();
+}
+
+std::thread& Proactor::get_thread()
+{
+    return *(this->main_thread);
 }

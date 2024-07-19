@@ -3,7 +3,7 @@
 
 #include "reactor.hpp"
 
-void print_from_fd(int fd)
+void echo_to_fd_continuously(int fd)
 {
     char c;
     read(fd, &c, sizeof(c));
@@ -13,7 +13,7 @@ void print_from_fd(int fd)
 int main()
 {
     Reactor reactor;
-    reactor.add_fd(STDIN_FILENO, print_from_fd);
+    reactor.add_fd(STDIN_FILENO, echo_to_fd_continuously);
     reactor.start();
     sleep(10);
     reactor.stop();
