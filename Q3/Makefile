@@ -4,8 +4,6 @@ GRAPH_DIR = ../graph_library
 GRAPH_LIB = libgraph
 BUILD_DIR = ../build
 
-# GRAPH_IMPL = ListGraph
-GRAPH_IMPL = AdjacencyGraph
 MAIN = main
 EXE = kosaraju
 

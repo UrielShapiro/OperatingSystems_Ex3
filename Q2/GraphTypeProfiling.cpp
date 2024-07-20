@@ -14,9 +14,15 @@
 
 using std::vector, std::pair;
 
+/**
+ * @brief Generate a random adjacency matrix
+ * @param num_vertices The number of vertices in the graph
+ * @param density The density of the graph
+ * @return A random adjacency matrix
+ */
 vector<vector<bool>> generate_adjacency_matrix(int num_vertices, double density)
 {
-    vector<vector<bool>> adj_matrix(num_vertices, vector<bool>(num_vertices, false));
+    vector<vector<bool>> adj_matrix(num_vertices, vector<bool>(num_vertices, false));   // Initialize the adjacency matrix with all false, meaning no edges
 
     static std::random_device rd;             // random number generator
     static std::mt19937 gen(rd());            // seeder
@@ -26,6 +32,7 @@ vector<vector<bool>> generate_adjacency_matrix(int num_vertices, double density)
     {
         for (int j = 0; j < num_vertices; ++j)
         {
+            // dis(gen) returns true with bernoulli probability of the density
             if (i != j && dis(gen))
             {
                 adj_matrix[i][j] = true;
@@ -37,10 +44,7 @@ vector<vector<bool>> generate_adjacency_matrix(int num_vertices, double density)
 
 int main()
 {
-    static std::random_device rd; // random number generator
-    static std::mt19937 gen(rd());
-
-    vector<size_t> amount_of_vertices = {5, 10, 20, 50, 100, 150, 170, 200};
+    vector<size_t> amount_of_vertices = {5, 10, 20, 50, 100, 150, 170, 200};    // The amount of vertices to test
     std::cout << "All times in microseconds averaged over " << TIMES_TO_RUN << " runs using the same graph for both implementations" << std::endl;
     std::cout << "Graph(n,p)\tAdj\tList\n";
 
@@ -68,10 +72,11 @@ int main()
                     }
                 }
 
+                // Create the graphs from the adjacency matrix
                 AdjacencyGraph adj_graph(num_vertices, edges);
                 ListGraph list_graph(num_vertices, edges);
 
-                size_t adj_comps_count, list_comps_count;
+                size_t adj_comps_count, list_comps_count;   // The amount of connected components in the graph for each implementation
 
                 // Open parenthesis to use the same variables again
                 {
@@ -93,6 +98,7 @@ int main()
                     std::cout << "Inconsistency: adj: " << adj_comps_count << ", list: " << list_comps_count << std::endl;
                 }
             }
+            // Print the average time for each implementation
             std::cout << "G(" << num_vertices << ", " << density << "): \t" << adj_sum / TIMES_TO_RUN << "\t" << list_sum / TIMES_TO_RUN << std::endl;
         }
     }

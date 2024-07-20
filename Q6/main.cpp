@@ -217,7 +217,7 @@ void client_main(int fd)
         return;
     }
     input.pop_back(); // Remove the newline character
-    if(handle_user_input(fd, input))
+    if (handle_user_input(fd, input))
     {
         return; // The user requested to close the connection, so we don't need to send a message
     }
@@ -231,8 +231,6 @@ void client_main(int fd)
 
 int main()
 {
-    size_t clients_count = 0;
-
     int server_fd = -1;
     int new_socket = -1;
     struct sockaddr_in address;
@@ -302,7 +300,6 @@ int main()
         {
             std::cout << "New connection accepted" << std::endl;
             reactor.add_fd(new_socket, client_main);
-            clients_count++;
             if (send_message(new_socket, "Enter command: "))
             {
                 close(new_socket);

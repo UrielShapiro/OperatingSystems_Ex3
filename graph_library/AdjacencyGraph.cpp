@@ -5,8 +5,8 @@ using std::vector, std::pair;
 
 AdjacencyGraph::AdjacencyGraph(size_t vertices, vector<pair<vertex, vertex>> edges)
 {
-    this->adjacency_matrix.reserve(vertices);
-    vector<bool> empty_row(vertices, false);
+    this->adjacency_matrix.reserve(vertices);   // Reserve space for the vertices in the adjacency matrix
+    vector<bool> empty_row(vertices, false);    // Initialize a row of the adjacency matrix with no neighbours
 
     for (size_t i = 0; i < vertices; i++)
     {
@@ -27,11 +27,15 @@ size_t AdjacencyGraph::get_vertex_count() const
 
 bool AdjacencyGraph::edge_exists(const vertex src, const vertex dst) const
 {
+    if (src > this->get_vertex_count() || dst > this->get_vertex_count() || src <= 0 || dst <= 0)
+        throw std::out_of_range("Error: Invalid argument passed, One of the vertices does not exist");
     return this->adjacency_matrix.at(src - 1).at(dst - 1);
 }
 
 std::list<vertex> AdjacencyGraph::get_neighbors(const vertex v) const
 {
+    if(v > this->get_vertex_count() || v <= 0)
+        throw std::out_of_range("Error: Invalid argument passed, Vertex does not exist");
     std::list<vertex> output;
     for (size_t i = 0; i < this->get_vertex_count(); i++)
     {
@@ -44,7 +48,7 @@ std::list<vertex> AdjacencyGraph::get_neighbors(const vertex v) const
 bool AdjacencyGraph::add_edge(const vertex src, const vertex dst)
 {
     if (src > this->get_vertex_count() || dst > this->get_vertex_count() || src <= 0 || dst <= 0)
-        throw std::invalid_argument("Error: Can't add this edge, Invalid argument passed");
+        throw std::out_of_range("Error: Can't add this edge, One of the vertices does not exist");
 
     bool output = !this->adjacency_matrix.at(src - 1).at(dst - 1);
     this->adjacency_matrix.at(src - 1).at(dst - 1) = true;
@@ -54,7 +58,7 @@ bool AdjacencyGraph::add_edge(const vertex src, const vertex dst)
 bool AdjacencyGraph::remove_edge(const vertex src, const vertex dst)
 {
     if (src > this->get_vertex_count() || dst > this->get_vertex_count() || src <= 0 || dst <= 0)
-        throw std::invalid_argument("Error: Can't remove this edge, Invalid argument passed");
+        throw std::out_of_range("Error: Can't remove this edge, One of the vertices does not exist");
 
     bool output = this->adjacency_matrix.at(src - 1).at(dst - 1);
     this->adjacency_matrix.at(src - 1).at(dst - 1) = false;
@@ -63,6 +67,9 @@ bool AdjacencyGraph::remove_edge(const vertex src, const vertex dst)
 
 std::list<vertex> AdjacencyGraph::get_incoming_neighbors(const vertex dst) const
 {
+    if(dst > this->get_vertex_count() || dst <= 0)
+        throw std::out_of_range("Error: Vertex does not exist");
+
     std::list<vertex> output;
     for (size_t i = 0; i < this->get_vertex_count(); i++)
     {

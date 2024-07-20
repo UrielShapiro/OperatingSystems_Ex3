@@ -3,3 +3,4 @@ ProfilingTest
 KosarajuProfiling
 *.o
 GraphTypeProfiling
+gmon.out

@@ -75,6 +75,7 @@ bool handle_user_input(int fd, string input)
     std::getline(is, command, ' ');
     if (command == "Kosaraju")
     {
+        std::set<std::set<vertex>> comps;
         {
             std::shared_lock<std::shared_mutex> graph_lock(graph_mutex);
             if (!g)
@@ -85,10 +86,6 @@ bool handle_user_input(int fd, string input)
                 }
                 return false;
             }
-        }
-        std::set<std::set<vertex>> comps;
-        {
-            std::shared_lock<std::shared_mutex> graph_lock(graph_mutex);
             comps = kosaraju(*g);
         }
         string message;
@@ -144,17 +141,16 @@ bool handle_user_input(int fd, string input)
     }
     else if (command == "Newedge")
     {
+        std::unique_lock<std::shared_mutex> graph_lock(graph_mutex);
+        if (!g)
         {
-            std::shared_lock<std::shared_mutex> graph_lock(graph_mutex);
-            if (!g)
+            if (send_message(fd, "Please create a graph using Newgraph <n>,<m> first\n"))
             {
-                if (send_message(fd, "Please create a graph using Newgraph <n>,<m> first\n"))
-                {
-                    throw std::runtime_error("Error sending a message to the client");
-                }
-                return false;
+                throw std::runtime_error("Error sending a message to the client");
             }
+            return false;
         }
+
         std::string param1, param2;
         std::getline(is, param1, ',');
         std::getline(is, param2);
@@ -166,38 +162,35 @@ bool handle_user_input(int fd, string input)
             }
         }
         vertex src = strtoull(param1.c_str(), nullptr, 10), dst = strtoull(param2.c_str(), nullptr, 10);
+
+        if (!g->add_edge(src, dst))
         {
-            std::unique_lock<std::shared_mutex> graph_lock(graph_mutex);
-            if (!g->add_edge(src, dst))
+            if (send_message(fd, "Edge already exists\n"))
             {
-                if (send_message(fd, "Edge already exists\n"))
-                {
-                    throw std::runtime_error("Error sending a message to the client");
-                }
+                throw std::runtime_error("Error sending a message to the client");
             }
-            else
+        }
+        else
+        {
+            if (send_message(fd, "Edge was created successfuly\n"))
             {
-                if (send_message(fd, "Edge was created successfuly\n"))
-                {
-                    throw std::runtime_error("Error sending a message to the client");
-                }
+                throw std::runtime_error("Error sending a message to the client");
             }
         }
         return false;
     }
     else if (command == "Removeedge")
     {
+        std::unique_lock<std::shared_mutex> graph_lock(graph_mutex);
+        if (!g)
         {
-            std::shared_lock<std::shared_mutex> graph_lock(graph_mutex);
-            if (!g)
+            if (send_message(fd, "Please create a graph using Newgraph <n>,<m> first\n"))
             {
-                if (send_message(fd, "Please create a graph using Newgraph <n>,<m> first\n"))
-                {
-                    throw std::runtime_error("Error sending a message to the client");
-                }
-                return false;
+                throw std::runtime_error("Error sending a message to the client");
             }
+            return false;
         }
+
         std::string param1, param2;
         std::getline(is, param1, ',');
         std::getline(is, param2);
@@ -209,21 +202,19 @@ bool handle_user_input(int fd, string input)
             }
         }
         vertex src = strtoull(param1.c_str(), nullptr, 10), dst = strtoull(param2.c_str(), nullptr, 10);
+
+        if (!g->remove_edge(src, dst))
         {
-            std::unique_lock<std::shared_mutex> graph_lock(graph_mutex);
-            if (!g->remove_edge(src, dst))
+            if (send_message(fd, "Edge does not exist\n"))
             {
-                if (send_message(fd, "Edge does not exist\n"))
-                {
-                    throw std::runtime_error("Error sending a message to the client");
-                }
+                throw std::runtime_error("Error sending a message to the client");
             }
-            else
+        }
+        else
+        {
+            if (send_message(fd, "Edge was removed successfuly\n"))
             {
-                if (send_message(fd, "Edge was removed successfuly\n"))
-                {
-                    throw std::runtime_error("Error sending a message to the client");
-                }
+                throw std::runtime_error("Error sending a message to the client");
             }
         }
         return false;

@@ -1,5 +1,6 @@
 CXX = g++
 CXXFLAGS = -Wall -Wextra -Werror -ggdb
+LDFLAGS = -pthread
 
 BUILD_DIR = ../build
 GRAPH_DIR = ../graph_library
@@ -13,7 +14,7 @@ EXE = kosaraju
 all: kosaraju
 
 kosaraju: $(MAIN).o $(BUILD_DIR)/$(GRAPH_LIB).a $(BUILD_DIR)/$(PATTERN_LIB).a | $(BUILD_DIR)
-	$(CXX) $(CXXFLAGS) -o $@ $^
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $^
 
 $(MAIN).o: $(MAIN).cpp | $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) -c -o $@ $<
